@@ -41,6 +41,18 @@ async function fetchSheet(name: string) {
   return parseCSV(await res.text());
 }
 
+// "세럼 매출액(KRW)" → "세럼" 추출
+function extractProductName(cellValue: string): string {
+  return cellValue
+    .replace(/매출액\(KRW\)/g, "")
+    .replace(/주문수/g, "")
+    .replace(/샘플출고수/g, "")
+    .replace(/SB\w+_US/g, "")
+    .replace(/BD\w+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET() {
   try {
     // ── GMV | Daily ──────────────────────────────────────────────
@@ -61,36 +73,15 @@ export async function GET() {
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
 
-    // 디버그: 첫 6행 확인
-    const debugRows = prodRows.slice(0, 6).map(r => r.slice(0, 20));
-
-    // 행 3(index 3)이 제품명, 행 4(index 4)가 매출액/주문수/샘플
-    // 단, 병합셀은 CSV에서 첫 셀에만 값이 있음
-    // → 매출액(KRW) 컬럼 기준으로 왼쪽 3칸 안에서 제품명 찾기
-    const nameRow = prodRows[3] || [];
-    const headerRow = prodRows[4] || [];
+    // 3행(index 2): "SB0791_US 세럼 매출액(KRW)" 형태로 제품명+헤더 합쳐짐
+    const headerRow = prodRows[2] || [];
 
     const productCols: { name: string; col: number }[] = [];
 
     for (let c = 2; c < headerRow.length; c++) {
-      const h = (headerRow[c] || "").trim();
-      if (h !== "매출액(KRW)") continue;
-
-      // 이 컬럼 포함 왼쪽으로 최대 5칸 안에서 제품명 찾기
-      let name = "";
-      for (let back = c; back >= Math.max(0, c - 5); back--) {
-        const n = (nameRow[back] || "").trim();
-        if (
-          n &&
-          n !== "매출액(KRW)" &&
-          n !== "주문수" &&
-          n !== "샘플출고수" &&
-          !/^\d+$/.test(n)
-        ) {
-          name = n;
-          break;
-        }
-      }
+      const cell = (headerRow[c] || "").trim();
+      if (!cell.includes("매출액(KRW)")) continue;
+      const name = extractProductName(cell);
       if (name) productCols.push({ name, col: c });
     }
 
@@ -104,7 +95,8 @@ export async function GET() {
       productOrders[name] = 0;
     }
 
-    for (const row of prodRows.slice(5)) {
+    // 데이터는 5행(index 4)부터
+    for (const row of prodRows.slice(4)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
       const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
@@ -149,8 +141,6 @@ export async function GET() {
 
     return NextResponse.json({
       daily, top15, thisMonthTop10, sojae,
-      debugRows,
-      debugProductCols: productCols.slice(0, 5),
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
