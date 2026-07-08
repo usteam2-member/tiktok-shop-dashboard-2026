@@ -7,9 +7,8 @@ import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
 import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
-import DailyChart from "@/components/DailyChart";
+import DailyCharts from "@/components/DailyChart";
 import ProductBars from "@/components/ProductBars";
-import MonthlyChart from "@/components/MonthlyChart";
 import ThisMonthChart from "@/components/ThisMonthChart";
 import styles from "./page.module.css";
 
@@ -75,15 +74,6 @@ export default function DashboardPage() {
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate]);
 
-  const last14Data = useMemo(() => {
-    if (!data?.daily.length) return [];
-    const allDates = data.daily;
-    const lastDt = dtToDate(allDates[allDates.length - 1].dt);
-    const twoWeeksAgo = new Date(lastDt);
-    twoWeeksAgo.setDate(lastDt.getDate() - 13);
-    return filterByRange(fmt(twoWeeksAgo), fmt(lastDt), allDates);
-  }, [data]);
-
   const thisMonthLabel = useMemo(() => {
     if (!data?.daily.length) return "";
     const lastDt = data.daily[data.daily.length - 1].dt;
@@ -120,12 +110,7 @@ export default function DashboardPage() {
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
             <KpiRow data={filteredData} />
-            <div className={styles.fullWidth}>
-              <DailyChart data={last14Data} />
-            </div>
-            <div className={styles.fullWidth}>
-              <MonthlyChart data={data.sojae} />
-            </div>
+            <DailyCharts data={filteredData} activeQuick={activeQuick} />
             <div className={styles.grid2}>
               <ProductBars data={data.top15} />
               <ThisMonthChart
