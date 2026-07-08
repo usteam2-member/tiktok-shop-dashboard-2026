@@ -31,7 +31,7 @@ function isDt(v: string) {
 }
 
 function safeNum(v: string): number {
-  const n = parseFloat(v.replace(/[,\s₩$]/g, ""));
+  const n = parseFloat(v.replace(/[,\s₩$%]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
@@ -41,7 +41,6 @@ async function fetchSheet(name: string) {
   return parseCSV(await res.text());
 }
 
-// "세럼 매출액(KRW)" → "세럼" 추출
 function extractProductName(cellValue: string): string {
   return cellValue
     .replace(/매출액\(KRW\)/g, "")
@@ -57,7 +56,10 @@ export async function GET() {
   try {
     // ── GMV | Daily ──────────────────────────────────────────────
     const dailyRows = await fetchSheet("GMV | Daily");
-    const daily: { dt: string; krw: number; ord: number; smp: number; aff: number }[] = [];
+    const daily: {
+      dt: string; krw: number; ord: number; smp: number; aff: number;
+      adCost: number; roas: number; unitPriceUsd: number;
+    }[] = [];
 
     for (const row of dailyRows) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
@@ -66,16 +68,16 @@ export async function GET() {
       const ord = safeNum(row[6] || "0");
       const smp = safeNum(row[5] || "0");
       const aff = safeNum(row[4] || "0");
+      const adCost = safeNum(row[11] || "0");
+      const roas = safeNum(row[16] || "0");
+      const unitPriceUsd = safeNum(row[17] || "0");
       if (krw === 0 && ord === 0) continue;
-      daily.push({ dt: dtRaw, krw, ord, smp, aff });
+      daily.push({ dt: dtRaw, krw, ord, smp, aff, adCost, roas, unitPriceUsd });
     }
 
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
-
-    // 3행(index 2): "SB0791_US 세럼 매출액(KRW)" 형태로 제품명+헤더 합쳐짐
     const headerRow = prodRows[2] || [];
-
     const productCols: { name: string; col: number }[] = [];
 
     for (let c = 2; c < headerRow.length; c++) {
@@ -95,7 +97,6 @@ export async function GET() {
       productOrders[name] = 0;
     }
 
-    // 데이터는 5행(index 4)부터
     for (const row of prodRows.slice(4)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
