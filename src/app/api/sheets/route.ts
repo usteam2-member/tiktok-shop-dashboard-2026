@@ -50,21 +50,22 @@ export async function GET() {
     for (const row of dailyRows) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
-
       const krw = safeNum(row[9] || "0");
       const ord = safeNum(row[6] || "0");
       const smp = safeNum(row[5] || "0");
       const aff = safeNum(row[4] || "0");
-
-      // 매출이 0이고 주문수도 0이면 아직 데이터 없는 날 → 제외
       if (krw === 0 && ord === 0) continue;
-
       daily.push({ dt: dtRaw, krw, ord, smp, aff });
     }
 
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
     const productTotals: Record<string, number> = {};
+    const productOrders: Record<string, number> = {};
+
+    // 이번달 계산 (데이터 마지막 날 기준)
+    const lastDt = daily[daily.length - 1]?.dt || "260101";
+    const thisMonth = lastDt.slice(0, 4); // 예: "2607"
 
     const headerRow = prodRows[3] || [];
     const productCols: { name: string; col: number }[] = [];
@@ -74,21 +75,34 @@ export async function GET() {
       if (name && h === "매출액(KRW)") {
         productCols.push({ name, col: c });
         productTotals[name] = 0;
+        productOrders[name] = 0;
       }
     }
 
     for (const row of prodRows.slice(7)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
+      const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
       for (const { name, col } of productCols) {
-        productTotals[name] = (productTotals[name] || 0) + safeNum(row[col] || "0");
+        const rev = safeNum(row[col] || "0");
+        const ord = safeNum(row[col + 1] || "0");
+        productTotals[name] += rev;
+        if (isThisMonth) productOrders[name] += ord;
       }
     }
 
+    // 전체 TOP 15 (매출 기준)
     const top15 = Object.entries(productTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([name, total]) => ({ name, total }));
+
+    // 이번달 TOP 10 (주문수 기준)
+    const thisMonthTop10 = Object.entries(productOrders)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, orders]) => ({ name, orders }));
 
     // ── GMV | 소재 ───────────────────────────────────────────────
     const sojaeRows = await fetchSheet("GMV | 소재");
@@ -113,6 +127,7 @@ export async function GET() {
     return NextResponse.json({
       daily,
       top15,
+      thisMonthTop10,
       sojae,
       updatedAt: new Date().toISOString()
     });
