@@ -2,9 +2,15 @@
 import { useState, useEffect } from "react";
 import { DailyRow, ProductRow, SojaeRow } from "./data";
 
+export interface ThisMonthProduct {
+  name: string;
+  orders: number;
+}
+
 export interface SheetData {
   daily: DailyRow[];
   top15: ProductRow[];
+  thisMonthTop10: ThisMonthProduct[];
   sojae: SojaeRow[];
   updatedAt: string;
 }
