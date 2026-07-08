@@ -55,4 +55,106 @@ export async function GET() {
       const smp = safeNum(row[5] || "0");
       const aff = safeNum(row[4] || "0");
       if (krw === 0 && ord === 0) continue;
-      daily.push({ dt: dtRaw, krw, ord, smp,
+      daily.push({ dt: dtRaw, krw, ord, smp, aff });
+    }
+
+    // ── GMV | by Product ─────────────────────────────────────────
+    const prodRows = await fetchSheet("GMV | by Product");
+
+    // 디버그: 첫 6행 확인
+    const debugRows = prodRows.slice(0, 6).map(r => r.slice(0, 20));
+
+    // 행 3(index 3)이 제품명, 행 4(index 4)가 매출액/주문수/샘플
+    // 단, 병합셀은 CSV에서 첫 셀에만 값이 있음
+    // → 매출액(KRW) 컬럼 기준으로 왼쪽 3칸 안에서 제품명 찾기
+    const nameRow = prodRows[3] || [];
+    const headerRow = prodRows[4] || [];
+
+    const productCols: { name: string; col: number }[] = [];
+
+    for (let c = 2; c < headerRow.length; c++) {
+      const h = (headerRow[c] || "").trim();
+      if (h !== "매출액(KRW)") continue;
+
+      // 이 컬럼 포함 왼쪽으로 최대 5칸 안에서 제품명 찾기
+      let name = "";
+      for (let back = c; back >= Math.max(0, c - 5); back--) {
+        const n = (nameRow[back] || "").trim();
+        if (
+          n &&
+          n !== "매출액(KRW)" &&
+          n !== "주문수" &&
+          n !== "샘플출고수" &&
+          !/^\d+$/.test(n)
+        ) {
+          name = n;
+          break;
+        }
+      }
+      if (name) productCols.push({ name, col: c });
+    }
+
+    const lastDt = daily[daily.length - 1]?.dt || "260101";
+    const thisMonth = lastDt.slice(0, 4);
+
+    const productTotals: Record<string, number> = {};
+    const productOrders: Record<string, number> = {};
+    for (const { name } of productCols) {
+      productTotals[name] = 0;
+      productOrders[name] = 0;
+    }
+
+    for (const row of prodRows.slice(5)) {
+      const dtRaw = (row[1] || "").replace(/\s/g, "");
+      if (!isDt(dtRaw)) continue;
+      const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
+      for (const { name, col } of productCols) {
+        productTotals[name] += safeNum(row[col] || "0");
+        if (isThisMonth) productOrders[name] += safeNum(row[col + 1] || "0");
+      }
+    }
+
+    const top15 = Object.entries(productTotals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15)
+      .map(([name, total]) => ({ name, total }));
+
+    const thisMonthTop10 = Object.entries(productOrders)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, orders]) => ({ name, orders }));
+
+    // ── GMV | 소재 ───────────────────────────────────────────────
+    const sojaeRows = await fetchSheet("GMV | 소재");
+    const sojae: { month: string; new: number; rev: number }[] = [];
+    const monthLabel: Record<string, string> = {
+      "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
+      "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
+      "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
+    };
+
+    for (const row of sojaeRows.slice(4)) {
+      const mRaw = (row[0] || "").replace(/\s/g, "");
+      if (!/^26\d{2}$/.test(mRaw)) continue;
+      let newSum = 0, revSum = 0;
+      for (let c = 3; c < row.length; c += 4) {
+        newSum += safeNum(row[c] || "0");
+        if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
+      }
+      if (newSum > 0 || revSum > 0) {
+        sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
+      }
+    }
+
+    return NextResponse.json({
+      daily, top15, thisMonthTop10, sojae,
+      debugRows,
+      debugProductCols: productCols.slice(0, 5),
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
