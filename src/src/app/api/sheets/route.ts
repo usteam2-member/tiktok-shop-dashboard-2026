@@ -2,12 +2,10 @@ import { NextResponse } from "next/server";
 
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 
-// 구글 시트 탭 이름 → CSV URL 변환
 function sheetUrl(sheetName: string) {
   return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
 }
 
-// CSV 파싱 (따옴표 포함 처리)
 function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   const lines = text.split("\n");
@@ -28,79 +26,105 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
-// "260101" 형식 날짜 판별
 function isDt(v: string) {
   return /^2[6-9]\d{4}$/.test(v.replace(/\s/g, ""));
 }
 
 function safeNum(v: string): number {
-  const n = parseFloat(v.replace(/[,\s₩$]/g, ""));
+  const n = parseFloat(v.replace(/[,\s₩$%]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
 async function fetchSheet(name: string) {
-  const res = await fetch(sheetUrl(name), { next: { revalidate: 300 } }); // 5분 캐시
+  const res = await fetch(sheetUrl(name), { cache: "no-store" });
   if (!res.ok) throw new Error(`시트 로드 실패: ${name}`);
   return parseCSV(await res.text());
 }
 
+function extractProductName(cellValue: string): string {
+  return cellValue
+    .replace(/매출액\(KRW\)/g, "")
+    .replace(/주문수/g, "")
+    .replace(/샘플출고수/g, "")
+    .replace(/SB\w+_US/g, "")
+    .replace(/BD\w+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET() {
   try {
-    // ── 1. GMV | Daily ──────────────────────────────────────────────
+    // ── GMV | Daily ──────────────────────────────────────────────
     const dailyRows = await fetchSheet("GMV | Daily");
-    const daily: { dt: string; krw: number; ord: number; smp: number; aff: number }[] = [];
+    const daily: {
+      dt: string; krw: number; ord: number; smp: number; aff: number;
+      adCost: number; roas: number; unitPriceUsd: number;
+    }[] = [];
 
     for (const row of dailyRows) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
-      daily.push({
-        dt: dtRaw,
-        krw: safeNum(row[9] || "0"),   // 총 매출 KRW
-        ord: safeNum(row[6] || "0"),   // 주문수
-        smp: safeNum(row[5] || "0"),   // 샘플 출고
-        aff: safeNum(row[4] || "0"),   // 소재 업로드
-      });
+      const krw = safeNum(row[9] || "0");
+      const ord = safeNum(row[6] || "0");
+      const smp = safeNum(row[5] || "0");
+      const aff = safeNum(row[4] || "0");
+      const adCost = safeNum(row[11] || "0");
+      const roas = safeNum(row[16] || "0");
+      const unitPriceUsd = safeNum(row[17] || "0");
+      if (krw === 0 && ord === 0) continue;
+      daily.push({ dt: dtRaw, krw, ord, smp, aff, adCost, roas, unitPriceUsd });
     }
 
-    // ── 2. GMV | by Product ─────────────────────────────────────────
+    // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
-    const productTotals: Record<string, number> = {};
-
-    // 헤더 행(row index 3)에서 제품명과 컬럼 위치 파악
-    const headerRow = prodRows[3] || [];
+    const headerRow = prodRows[2] || [];
     const productCols: { name: string; col: number }[] = [];
-    for (let c = 3; c < headerRow.length; c += 3) {
-      const name = headerRow[c]?.trim();
-      const h = (prodRows[4] || [])[c]?.trim();
-      if (name && h === "매출액(KRW)") {
-        productCols.push({ name, col: c });
-        productTotals[name] = 0;
-      }
+
+    for (let c = 2; c < headerRow.length; c++) {
+      const cell = (headerRow[c] || "").trim();
+      if (!cell.includes("매출액(KRW)")) continue;
+      const name = extractProductName(cell);
+      if (name) productCols.push({ name, col: c });
     }
 
-    // 데이터 행에서 제품별 누적 합산
-    for (const row of prodRows.slice(7)) {
+    const lastDt = daily[daily.length - 1]?.dt || "260101";
+    const thisMonth = lastDt.slice(0, 4);
+
+    const productTotals: Record<string, number> = {};
+    const productOrders: Record<string, number> = {};
+    for (const { name } of productCols) {
+      productTotals[name] = 0;
+      productOrders[name] = 0;
+    }
+
+    for (const row of prodRows.slice(4)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
+      const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
       for (const { name, col } of productCols) {
-        productTotals[name] = (productTotals[name] || 0) + safeNum(row[col] || "0");
+        productTotals[name] += safeNum(row[col] || "0");
+        if (isThisMonth) productOrders[name] += safeNum(row[col + 1] || "0");
       }
     }
 
-    // Top 15 정렬
     const top15 = Object.entries(productTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([name, total]) => ({ name, total }));
 
-    // ── 3. GMV | 소재 ───────────────────────────────────────────────
+    const thisMonthTop10 = Object.entries(productOrders)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, orders]) => ({ name, orders }));
+
+    // ── GMV | 소재 ───────────────────────────────────────────────
     const sojaeRows = await fetchSheet("GMV | 소재");
     const sojae: { month: string; new: number; rev: number }[] = [];
     const monthLabel: Record<string, string> = {
-      "2601": "1월","2602": "2월","2603": "3월",
-      "2604": "4월","2605": "5월","2606": "6월",
-      "2607": "7월","2608": "8월","2609": "9월",
-      "2610": "10월","2611": "11월","2612": "12월",
+      "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
+      "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
+      "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
     for (const row of sojaeRows.slice(4)) {
@@ -111,10 +135,15 @@ export async function GET() {
         newSum += safeNum(row[c] || "0");
         if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
       }
-      sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
+      if (newSum > 0 || revSum > 0) {
+        sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
+      }
     }
 
-    return NextResponse.json({ daily, top15, sojae, updatedAt: new Date().toISOString() });
+    return NextResponse.json({
+      daily, top15, thisMonthTop10, sojae,
+      updatedAt: new Date().toISOString()
+    });
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
