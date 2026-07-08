@@ -61,24 +61,23 @@ export async function GET() {
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
 
-    // 3행: 제품명, 5행: 매출액(KRW) / 주문수 / 샘플출고수
-    const nameRow = prodRows[2] || [];   // 3행 (0-indexed: 2)
-    const headerRow = prodRows[4] || []; // 5행 (0-indexed: 4)
+    // 4행(index 3): 제품명 (병합셀)
+    // 5행(index 4): 매출액(KRW) / 주문수 / 샘플출고수
+    const nameRow = prodRows[3] || [];
+    const headerRow = prodRows[4] || [];
 
+    // 제품명 매핑: 헤더가 매출액(KRW)인 컬럼 찾고, 가장 가까운 제품명 사용
     const productCols: { name: string; col: number }[] = [];
-    for (let c = 2; c < nameRow.length; c++) {
+    let lastProductName = "";
+
+    for (let c = 2; c < headerRow.length; c++) {
+      const nameVal = (nameRow[c] || "").trim();
+      if (nameVal && nameVal !== "매출액(KRW)" && nameVal !== "주문수" && nameVal !== "샘플출고수") {
+        lastProductName = nameVal;
+      }
       const h = (headerRow[c] || "").trim();
-      if (h === "매출액(KRW)") {
-        // 제품명은 이 컬럼이나 앞 컬럼에서 찾기
-        let name = "";
-        for (let back = c; back >= Math.max(0, c - 2); back--) {
-          const n = (nameRow[back] || "").trim();
-          if (n && !/^\d+$/.test(n) && n !== "매출액(KRW)" && n !== "주문수" && n !== "샘플출고수") {
-            name = n;
-            break;
-          }
-        }
-        if (name) productCols.push({ name, col: c });
+      if (h === "매출액(KRW)" && lastProductName) {
+        productCols.push({ name: lastProductName, col: c });
       }
     }
 
