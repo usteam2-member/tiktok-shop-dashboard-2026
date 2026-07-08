@@ -36,7 +36,7 @@ function safeNum(v: string): number {
 }
 
 async function fetchSheet(name: string) {
-  const res = await fetch(sheetUrl(name), { next: { revalidate: 300 } });
+  const res = await fetch(sheetUrl(name), { cache: "no-store" });
   if (!res.ok) throw new Error(`시트 로드 실패: ${name}`);
   return parseCSV(await res.text());
 }
@@ -55,94 +55,4 @@ export async function GET() {
       const smp = safeNum(row[5] || "0");
       const aff = safeNum(row[4] || "0");
       if (krw === 0 && ord === 0) continue;
-      daily.push({ dt: dtRaw, krw, ord, smp, aff });
-    }
-
-    // ── GMV | by Product ─────────────────────────────────────────
-    const prodRows = await fetchSheet("GMV | by Product");
-
-    // 4행(index 3): 제품명 (병합셀)
-    // 5행(index 4): 매출액(KRW) / 주문수 / 샘플출고수
-    const nameRow = prodRows[3] || [];
-    const headerRow = prodRows[4] || [];
-
-    // 제품명 매핑: 헤더가 매출액(KRW)인 컬럼 찾고, 가장 가까운 제품명 사용
-    const productCols: { name: string; col: number }[] = [];
-    let lastProductName = "";
-
-    for (let c = 2; c < headerRow.length; c++) {
-      const nameVal = (nameRow[c] || "").trim();
-      if (nameVal && nameVal !== "매출액(KRW)" && nameVal !== "주문수" && nameVal !== "샘플출고수") {
-        lastProductName = nameVal;
-      }
-      const h = (headerRow[c] || "").trim();
-      if (h === "매출액(KRW)" && lastProductName) {
-        productCols.push({ name: lastProductName, col: c });
-      }
-    }
-
-    // 이번달 = 데이터 마지막 날 기준
-    const lastDt = daily[daily.length - 1]?.dt || "260101";
-    const thisMonth = lastDt.slice(0, 4);
-
-    const productTotals: Record<string, number> = {};
-    const productOrders: Record<string, number> = {};
-    for (const { name } of productCols) {
-      productTotals[name] = 0;
-      productOrders[name] = 0;
-    }
-
-    for (const row of prodRows.slice(5)) {
-      const dtRaw = (row[1] || "").replace(/\s/g, "");
-      if (!isDt(dtRaw)) continue;
-      const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
-      for (const { name, col } of productCols) {
-        const rev = safeNum(row[col] || "0");
-        const ord = safeNum(row[col + 1] || "0");
-        productTotals[name] += rev;
-        if (isThisMonth) productOrders[name] += ord;
-      }
-    }
-
-    const top15 = Object.entries(productTotals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 15)
-      .map(([name, total]) => ({ name, total }));
-
-    const thisMonthTop10 = Object.entries(productOrders)
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([name, orders]) => ({ name, orders }));
-
-    // ── GMV | 소재 ───────────────────────────────────────────────
-    const sojaeRows = await fetchSheet("GMV | 소재");
-    const sojae: { month: string; new: number; rev: number }[] = [];
-    const monthLabel: Record<string, string> = {
-      "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
-      "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
-      "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
-    };
-
-    for (const row of sojaeRows.slice(4)) {
-      const mRaw = (row[0] || "").replace(/\s/g, "");
-      if (!/^26\d{2}$/.test(mRaw)) continue;
-      let newSum = 0, revSum = 0;
-      for (let c = 3; c < row.length; c += 4) {
-        newSum += safeNum(row[c] || "0");
-        if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
-      }
-      if (newSum > 0 || revSum > 0) {
-        sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
-      }
-    }
-
-    return NextResponse.json({
-      daily, top15, thisMonthTop10, sojae,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
-  }
-}
+      daily.push({ dt: dtRaw, krw, ord, smp,
