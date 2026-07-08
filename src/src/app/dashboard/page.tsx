@@ -7,25 +7,30 @@ import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
 import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
-import DailyChart from "@/components/DailyChart";
+import DailyCharts from "@/components/DailyChart";
 import ProductBars from "@/components/ProductBars";
+import ThisMonthChart from "@/components/ThisMonthChart";
 import styles from "./page.module.css";
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
+const MONTH_LABEL: Record<string, string> = {
+  "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
+  "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
+  "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data, loading, error } = useSheetData();
 
-  // 데이터 로드 후 실제 마지막 날짜 기준으로 기본값 설정
   const [startDate, setStartDate] = useState(searchParams.get("start") || "");
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
 
-  // 데이터 로드되면 URL 파라미터 없을 때 전체 범위로 초기화
   useEffect(() => {
     if (!data || startDate) return;
     const allDates = data.daily;
@@ -34,7 +39,6 @@ export default function DashboardPage() {
     const last = fmt(dtToDate(allDates[allDates.length - 1].dt));
     setStartDate(first);
     setEndDate(last);
-    setActiveQuick(null); // 전체
     router.replace(`/dashboard?start=${first}&end=${last}`, { scroll: false });
   }, [data]);
 
@@ -47,18 +51,16 @@ export default function DashboardPage() {
     setActiveQuick(days);
     const allDates = data.daily;
     const lastDt = allDates[allDates.length - 1].dt;
-    const endDate = dtToDate(lastDt);
+    const endD = dtToDate(lastDt);
     let startD: Date;
     if (days === null) {
-      // 전체: 데이터의 첫 날부터
       startD = dtToDate(allDates[0].dt);
     } else {
-      // N일: 마지막 날 기준 N일 전
-      startD = new Date(endDate);
-      startD.setDate(endDate.getDate() - days + 1);
+      startD = new Date(endD);
+      startD.setDate(endD.getDate() - days + 1);
     }
     const s = fmt(startD);
-    const e = fmt(endDate);
+    const e = fmt(endD);
     setStartDate(s);
     setEndDate(e);
     pushParams(s, e);
@@ -67,20 +69,15 @@ export default function DashboardPage() {
   const handleStart = (v: string) => { setStartDate(v); setActiveQuick(null); pushParams(v, endDate); };
   const handleEnd = (v: string) => { setEndDate(v); setActiveQuick(null); pushParams(startDate, v); };
 
-  // 날짜 필터 적용
   const filteredData = useMemo(() => {
     if (!data || !startDate || !endDate) return [];
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate]);
 
-  // 최근 2주 데이터 (차트용)
-  const last14Data = useMemo(() => {
-    if (!data?.daily.length) return [];
-    const allDates = data.daily;
-    const lastDt = dtToDate(allDates[allDates.length - 1].dt);
-    const twoWeeksAgo = new Date(lastDt);
-    twoWeeksAgo.setDate(lastDt.getDate() - 13);
-    return filterByRange(fmt(twoWeeksAgo), fmt(lastDt), allDates);
+  const thisMonthLabel = useMemo(() => {
+    if (!data?.daily.length) return "";
+    const lastDt = data.daily[data.daily.length - 1].dt;
+    return MONTH_LABEL[lastDt.slice(0, 4)] || lastDt.slice(0, 4);
   }, [data]);
 
   return (
@@ -96,38 +93,30 @@ export default function DashboardPage() {
         onQuick={handleQuick}
       />
       <main className={styles.main}>
-
         {loading && (
           <div className={styles.loadingWrap}>
             <div className={styles.spinner} />
             <p>구글 시트에서 데이터 불러오는 중...</p>
           </div>
         )}
-
         {error && (
           <div className={styles.errorWrap}>
             <p>⚠️ 데이터 로드 실패: {error}</p>
-            <p style={{fontSize:12,marginTop:4}}>구글 시트 공유 설정을 확인해주세요.</p>
           </div>
         )}
-
         {data && !loading && (
           <>
             <div className={styles.updateInfo}>
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
-
-            {/* KPI: 선택 기간 기준 */}
             <KpiRow data={filteredData} />
-
-            {/* 일별 차트: 최근 2주 고정, 4개 지표 한 번에 */}
-            <div className={styles.fullWidth}>
-              <DailyChart data={last14Data} />
-            </div>
-
-            {/* 제품별 TOP 15 */}
-            <div className={styles.fullWidth}>
+            <DailyCharts data={filteredData} activeQuick={activeQuick} />
+            <div className={styles.grid2}>
               <ProductBars data={data.top15} />
+              <ThisMonthChart
+                data={data.thisMonthTop10 || []}
+                month={thisMonthLabel}
+              />
             </div>
           </>
         )}
