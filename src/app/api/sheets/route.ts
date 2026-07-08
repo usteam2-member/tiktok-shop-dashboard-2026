@@ -60,26 +60,40 @@ export async function GET() {
 
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
-    const productTotals: Record<string, number> = {};
-    const productOrders: Record<string, number> = {};
 
-    // 이번달 계산 (데이터 마지막 날 기준)
-    const lastDt = daily[daily.length - 1]?.dt || "260101";
-    const thisMonth = lastDt.slice(0, 4); // 예: "2607"
+    // 3행: 제품명, 5행: 매출액(KRW) / 주문수 / 샘플출고수
+    const nameRow = prodRows[2] || [];   // 3행 (0-indexed: 2)
+    const headerRow = prodRows[4] || []; // 5행 (0-indexed: 4)
 
-    const headerRow = prodRows[3] || [];
     const productCols: { name: string; col: number }[] = [];
-    for (let c = 3; c < headerRow.length; c += 3) {
-      const name = headerRow[c]?.trim();
-      const h = (prodRows[4] || [])[c]?.trim();
-      if (name && h === "매출액(KRW)") {
-        productCols.push({ name, col: c });
-        productTotals[name] = 0;
-        productOrders[name] = 0;
+    for (let c = 2; c < nameRow.length; c++) {
+      const h = (headerRow[c] || "").trim();
+      if (h === "매출액(KRW)") {
+        // 제품명은 이 컬럼이나 앞 컬럼에서 찾기
+        let name = "";
+        for (let back = c; back >= Math.max(0, c - 2); back--) {
+          const n = (nameRow[back] || "").trim();
+          if (n && !/^\d+$/.test(n) && n !== "매출액(KRW)" && n !== "주문수" && n !== "샘플출고수") {
+            name = n;
+            break;
+          }
+        }
+        if (name) productCols.push({ name, col: c });
       }
     }
 
-    for (const row of prodRows.slice(7)) {
+    // 이번달 = 데이터 마지막 날 기준
+    const lastDt = daily[daily.length - 1]?.dt || "260101";
+    const thisMonth = lastDt.slice(0, 4);
+
+    const productTotals: Record<string, number> = {};
+    const productOrders: Record<string, number> = {};
+    for (const { name } of productCols) {
+      productTotals[name] = 0;
+      productOrders[name] = 0;
+    }
+
+    for (const row of prodRows.slice(5)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
       const isThisMonth = dtRaw.slice(0, 4) === thisMonth;
@@ -91,13 +105,11 @@ export async function GET() {
       }
     }
 
-    // 전체 TOP 15 (매출 기준)
     const top15 = Object.entries(productTotals)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
       .map(([name, total]) => ({ name, total }));
 
-    // 이번달 TOP 10 (주문수 기준)
     const thisMonthTop10 = Object.entries(productOrders)
       .filter(([, v]) => v > 0)
       .sort((a, b) => b[1] - a[1])
@@ -121,14 +133,13 @@ export async function GET() {
         newSum += safeNum(row[c] || "0");
         if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
       }
-      sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
+      if (newSum > 0 || revSum > 0) {
+        sojae.push({ month: monthLabel[mRaw] || mRaw, new: newSum, rev: revSum });
+      }
     }
 
     return NextResponse.json({
-      daily,
-      top15,
-      thisMonthTop10,
-      sojae,
+      daily, top15, thisMonthTop10, sojae,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
