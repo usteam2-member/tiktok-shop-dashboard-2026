@@ -69,14 +69,14 @@ export default function DashboardPage() {
 
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    if (activeQuick === 3) return data.productTop10ByPeriod["3"];
+    if (activeQuick === 1) return data.productTop10ByPeriod["3"].slice(0, 10);
     if (activeQuick === 7) return data.productTop10ByPeriod["7"];
     if (activeQuick === 30) return data.productTop10ByPeriod["30"];
     if (activeQuick === 90) return data.productTop10ByPeriod["90"];
     return data.productTop10ByPeriod["all"];
   }, [data, activeQuick]);
 
-  const periodLabel = activeQuick === 3 ? "최근 3일" :
+  const periodLabel = activeQuick === 1 ? "오늘" :
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
