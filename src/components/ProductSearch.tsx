@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { ProductItem } from "@/lib/useSheetData";
+import ProductDetailChart from "@/components/ProductDetailChart";
 import styles from "./ProductSearch.module.css";
 
 interface Props {
@@ -38,7 +39,6 @@ export default function ProductSearch({ products }: Props) {
       {/* 검색 결과 목록 */}
       {!selected && filtered.length > 0 && (
         <div className={styles.resultList}>
-          {/* 헤더 */}
           <div className={styles.resultHeader}>
             <span>제품</span>
             <div className={styles.headerCols}>
@@ -83,6 +83,7 @@ export default function ProductSearch({ products }: Props) {
             {selected.sku && <div className={styles.detailMeta}>SKU: {selected.sku}</div>}
           </div>
 
+          {/* KPI 카드 */}
           <div className={styles.kpiGrid}>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>오늘 주문수</div>
@@ -113,6 +114,9 @@ export default function ProductSearch({ products }: Props) {
               <div className={styles.kpiVal}>{selected.revSojae.toLocaleString()}</div>
             </div>
           </div>
+
+          {/* 추이 차트 */}
+          <ProductDetailChart series={selected.dailySeries} />
         </div>
       )}
 
