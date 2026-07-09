@@ -1,0 +1,84 @@
+.wrap { padding: 0; }
+
+.searchBox {
+  position: relative;
+  margin-bottom: 16px;
+}
+.input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  font-size: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+  font-family: var(--font);
+}
+.input:focus { border-color: var(--accent); }
+.clear {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  font-size: 14px; padding: 4px;
+}
+
+.resultList {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.resultRow {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.resultRow:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(59,130,246,.1);
+}
+.resultName { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.resultMeta { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.resultMeta b { color: var(--text); }
+.resultSku { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+.noResult { text-align: center; color: var(--muted); font-size: 13px; padding: 40px; }
+
+.detail { }
+.back {
+  background: none; border: none;
+  color: var(--accent); cursor: pointer;
+  font-size: 13px; padding: 0;
+  margin-bottom: 16px; display: block;
+}
+.back:hover { text-decoration: underline; }
+.detailName { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.detailMeta { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+@media (max-width: 900px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.kpiCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.kpiLabel { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.kpiVal { font-size: 22px; font-weight: 600; color: var(--text); }
+
+.empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--muted);
+}
+.emptyIcon { font-size: 40px; margin-bottom: 12px; }
+.emptyText { font-size: 14px; margin-bottom: 8px; }
+.emptyCount { font-size: 12px; color: #94a3b8; }
