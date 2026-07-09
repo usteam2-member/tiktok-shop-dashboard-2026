@@ -34,6 +34,7 @@ function processData(series: ProductDailySeries[], tab: string) {
     return Math.round((lastDate.getTime() - new Date(y,m,d).getTime()) / 86400000);
   };
 
+  // 데일리: 최근 14일 1일 단위
   if (tab === "데일리") {
     const filtered = all.filter(r => diffDays(r.dt) < 14);
     return {
@@ -44,8 +45,9 @@ function processData(series: ProductDailySeries[], tab: string) {
     };
   }
 
+  // 위클리: 최근 7일 1일 단위
   if (tab === "위클리") {
-    const filtered = all.filter(r => diffDays(r.dt) < 90);
+    const filtered = all.filter(r => diffDays(r.dt) < 7);
     return {
       labels: filtered.map(r => r.dt.slice(2,4) + "/" + r.dt.slice(4,6)),
       ordData: filtered.map(r => r.ord),
@@ -54,12 +56,13 @@ function processData(series: ProductDailySeries[], tab: string) {
     };
   }
 
+  // 먼슬리: 전체 데이터 5일 단위 샘플링
   if (tab === "먼슬리") {
     const labels: string[] = [];
     const ordData: number[] = [];
     const smpData: number[] = [];
     const revData: number[] = [];
-    for (let i = 0; i < all.length; i += 3) {
+    for (let i = 0; i < all.length; i += 5) {
       labels.push(all[i].dt.slice(2,4) + "/" + all[i].dt.slice(4,6));
       ordData.push(all[i].ord);
       smpData.push(all[i].smp);
@@ -192,18 +195,25 @@ export default function ProductDetailChart({ series }: Props) {
   const [activeTab, setActiveTab] = useState("데일리");
   const { labels, ordData, smpData, revData } = processData(series, activeTab);
 
+  const tabLabel = activeTab === "데일리" ? "최근 14일 (1일 단위)" :
+    activeTab === "위클리" ? "최근 7일 (1일 단위)" :
+    activeTab === "먼슬리" ? "전체 (5일 간격)" : "전체 (월별)";
+
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {TABS.map(t => (
-          <button key={t} onClick={() => setActiveTab(t)} style={{
-            fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid",
-            borderColor: activeTab === t ? "#3b82f6" : "#e2e6ea",
-            background: activeTab === t ? "#3b82f6" : "#fff",
-            color: activeTab === t ? "#fff" : "#64748b",
-            cursor: "pointer", fontWeight: activeTab === t ? 600 : 400,
-          }}>{t}</button>
-        ))}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 6 }}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setActiveTab(t)} style={{
+              fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid",
+              borderColor: activeTab === t ? "#3b82f6" : "#e2e6ea",
+              background: activeTab === t ? "#3b82f6" : "#fff",
+              color: activeTab === t ? "#fff" : "#64748b",
+              cursor: "pointer", fontWeight: activeTab === t ? 600 : 400,
+            }}>{t}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: "#94a3b8" }}>{tabLabel}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <OrderRevenueChart labels={labels} ordData={ordData} revData={revData} />
