@@ -16,12 +16,6 @@ function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
-const MONTH_LABEL: Record<string, string> = {
-  "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
-  "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
-  "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
-};
-
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,12 +68,6 @@ export default function DashboardPage() {
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate]);
 
-  const thisMonthLabel = useMemo(() => {
-    if (!data?.daily.length) return "";
-    const lastDt = data.daily[data.daily.length - 1].dt;
-    return MONTH_LABEL[lastDt.slice(0, 4)] || lastDt.slice(0, 4);
-  }, [data]);
-
   return (
     <div className={styles.wrap}>
       <Navbar startDate={startDate} endDate={endDate} />
@@ -114,8 +102,8 @@ export default function DashboardPage() {
             <div className={styles.grid2}>
               <ProductBars data={data.top15} />
               <ThisMonthChart
-                data={data.thisMonthTop10 || []}
-                month={thisMonthLabel}
+                monthlyTop10={data.monthlyTop10 || {}}
+                availableMonths={data.availableMonths || []}
               />
             </div>
           </>
