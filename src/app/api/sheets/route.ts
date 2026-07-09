@@ -156,7 +156,7 @@ export async function GET() {
     );
 
     const productTop10ByPeriod = {
-      "3": getTopByDays(productDailyOrders, lastDate, 3),
+      "1": getTopByDays(productDailyOrders, lastDate, 1),
       "7": getTopByDays(productDailyOrders, lastDate, 7),
       "30": getTopByDays(productDailyOrders, lastDate, 30),
       "90": getTopByDays(productDailyOrders, lastDate, 90),
