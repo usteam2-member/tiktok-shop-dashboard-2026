@@ -23,6 +23,7 @@ export default function ProductSearch({ products }: Props) {
     <div className={styles.wrap}>
       {/* 검색창 */}
       <div className={styles.searchBox}>
+        <span className={styles.searchIcon}>🔍</span>
         <input
           className={styles.input}
           placeholder="제품명, PID, SKU로 검색..."
@@ -37,15 +38,32 @@ export default function ProductSearch({ products }: Props) {
       {/* 검색 결과 목록 */}
       {!selected && filtered.length > 0 && (
         <div className={styles.resultList}>
+          {/* 헤더 */}
+          <div className={styles.resultHeader}>
+            <span>제품</span>
+            <div className={styles.headerCols}>
+              <span>이번달 주문</span>
+              <span>이번달 샘플</span>
+              <span>신규 소재</span>
+            </div>
+          </div>
           {filtered.map(p => (
             <div key={p.name} className={styles.resultRow} onClick={() => setSelected(p)}>
-              <div className={styles.resultName}>{p.name}</div>
-              <div className={styles.resultMeta}>
-                <span>7일 주문: <b>{p.ord7.toLocaleString()}</b></span>
-                <span>이번달 주문: <b>{p.ordThisMonth.toLocaleString()}</b></span>
-                <span>이번달 샘플: <b>{p.smpThisMonth.toLocaleString()}</b></span>
+              <div className={styles.resultLeft}>
+                <div className={styles.resultName}>{p.name}</div>
+                {p.pid && <div className={styles.resultPid}>PID: {p.pid}</div>}
               </div>
-              {p.sku && <div className={styles.resultSku}>SKU: {p.sku} {p.pid && `· PID: ${p.pid.slice(0,8)}...`}</div>}
+              <div className={styles.resultCols}>
+                <div className={styles.colItem}>
+                  <span className={styles.colVal}>{p.ordThisMonth.toLocaleString()}</span>
+                </div>
+                <div className={styles.colItem}>
+                  <span className={styles.colVal}>{p.smpThisMonth.toLocaleString()}</span>
+                </div>
+                <div className={styles.colItem}>
+                  <span className={styles.colVal}>{p.newSojae.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -59,9 +77,11 @@ export default function ProductSearch({ products }: Props) {
       {selected && (
         <div className={styles.detail}>
           <button className={styles.back} onClick={() => setSelected(null)}>← 목록으로</button>
-          <h2 className={styles.detailName}>{selected.name}</h2>
-          {selected.sku && <div className={styles.detailMeta}>SKU: {selected.sku}</div>}
-          {selected.pid && <div className={styles.detailMeta}>PID: {selected.pid}</div>}
+          <div className={styles.detailHeader}>
+            <h2 className={styles.detailName}>{selected.name}</h2>
+            {selected.pid && <div className={styles.detailMeta}>PID: {selected.pid}</div>}
+            {selected.sku && <div className={styles.detailMeta}>SKU: {selected.sku}</div>}
+          </div>
 
           <div className={styles.kpiGrid}>
             <div className={styles.kpiCard}>
