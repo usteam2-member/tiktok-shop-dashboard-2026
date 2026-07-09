@@ -8,10 +8,9 @@ Chart.register(...registerables);
 
 interface Props {
   data: DailyRow[];
-  activeQuick: number | null; // 3, 7, 30, 90, null(전체)
+  activeQuick: number | null;
 }
 
-// 날짜 범위에 따라 데이터 집계
 function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
   if (!data.length) return { labels: [], rows: [] };
 
@@ -23,29 +22,8 @@ function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: 
     };
   }
 
-  // 30일 → 3일 단위
-  if (activeQuick === 30) {
-    const grouped: DailyRow[] = [];
-    const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 3) {
-      const chunk = data.slice(i, i + 3);
-      labels.push(chunk[0].dt.slice(2, 4) + "/" + chunk[0].dt.slice(4, 6));
-      grouped.push({
-        dt: chunk[0].dt,
-        krw: chunk.reduce((a, r) => a + r.krw, 0),
-        ord: chunk.reduce((a, r) => a + r.ord, 0),
-        smp: chunk.reduce((a, r) => a + r.smp, 0),
-        aff: chunk.reduce((a, r) => a + r.aff, 0),
-        adCost: chunk.reduce((a, r) => a + r.adCost, 0),
-        roas: chunk.reduce((a, r) => a + r.roas, 0) / chunk.length,
-        unitPriceUsd: chunk.reduce((a, r) => a + r.unitPriceUsd, 0) / chunk.length,
-      });
-    }
-    return { labels, rows: grouped };
-  }
-
-  // 90일 → 10일 단위
-  if (activeQuick === 90) {
+  // 30일, 90일 → 10일 단위
+  if (activeQuick === 30 || activeQuick === 90) {
     const grouped: DailyRow[] = [];
     const labels: string[] = [];
     for (let i = 0; i < data.length; i += 10) {
@@ -65,7 +43,7 @@ function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: 
     return { labels, rows: grouped };
   }
 
-  // 전체 → 월별
+  // 전체(null) → 월별
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -157,15 +135,15 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 export default function DailyCharts({ data, activeQuick }: Props) {
   const { labels, rows } = aggregateData(data, activeQuick);
 
-  const periodLabel = activeQuick === 3 ? "최근 3일" :
-    activeQuick === 7 ? "최근 7일" :
-    activeQuick === 30 ? "최근 30일 (3일 단위)" :
+  const periodLabel = activeQuick === 3 ? "최근 3일 (1일 단위)" :
+    activeQuick === 7 ? "최근 7일 (1일 단위)" :
+    activeQuick === 30 ? "최근 30일 (10일 단위)" :
     activeQuick === 90 ? "최근 90일 (10일 단위)" : "전체 (월별)";
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
       <LineChart
-        title={`일별 매출 & 주문수 (${periodLabel})`}
+        title={`매출 & 주문수 (${periodLabel})`}
         labels={labels}
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toLocaleString()}
