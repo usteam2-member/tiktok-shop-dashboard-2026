@@ -8,7 +8,6 @@ import TabBar from "@/components/TabBar";
 import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
-import ProductBars from "@/components/ProductBars";
 import ThisMonthChart from "@/components/ThisMonthChart";
 import styles from "./page.module.css";
 
@@ -68,6 +67,20 @@ export default function DashboardPage() {
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate]);
 
+  const top10Data = useMemo(() => {
+    if (!data?.productTop10ByPeriod) return [];
+    if (activeQuick === 3) return data.productTop10ByPeriod["3"];
+    if (activeQuick === 7) return data.productTop10ByPeriod["7"];
+    if (activeQuick === 30) return data.productTop10ByPeriod["30"];
+    if (activeQuick === 90) return data.productTop10ByPeriod["90"];
+    return data.productTop10ByPeriod["all"];
+  }, [data, activeQuick]);
+
+  const periodLabel = activeQuick === 3 ? "최근 3일" :
+    activeQuick === 7 ? "최근 7일" :
+    activeQuick === 30 ? "최근 30일" :
+    activeQuick === 90 ? "최근 90일" : "전체";
+
   return (
     <div className={styles.wrap}>
       <Navbar startDate={startDate} endDate={endDate} />
@@ -99,11 +112,10 @@ export default function DashboardPage() {
             </div>
             <KpiRow data={filteredData} />
             <DailyCharts data={filteredData} activeQuick={activeQuick} />
-            <div className={styles.grid2}>
-              <ProductBars data={data.top15} />
+            <div className={styles.fullWidth}>
               <ThisMonthChart
-                monthlyTop10={data.monthlyTop10 || {}}
-                availableMonths={data.availableMonths || []}
+                data={top10Data}
+                periodLabel={periodLabel}
               />
             </div>
           </>
