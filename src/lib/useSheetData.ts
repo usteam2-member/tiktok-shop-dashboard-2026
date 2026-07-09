@@ -7,6 +7,13 @@ export interface ProductTop10Item {
   orders: number;
 }
 
+export interface ProductDailySeries {
+  dt: string;
+  ord: number;
+  smp: number;
+  rev: number;
+}
+
 export interface ProductItem {
   name: string;
   pid: string;
@@ -18,6 +25,7 @@ export interface ProductItem {
   smpThisMonth: number;
   newSojae: number;
   revSojae: number;
+  dailySeries: ProductDailySeries[];
 }
 
 export interface SheetData {
