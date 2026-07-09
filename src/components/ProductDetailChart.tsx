@@ -35,7 +35,6 @@ function processData(series: ProductDailySeries[], tab: string) {
   };
 
   if (tab === "데일리") {
-    // 최근 14일 1일 단위
     const filtered = all.filter(r => diffDays(r.dt) < 14);
     return {
       labels: filtered.map(r => r.dt.slice(2,4) + "/" + r.dt.slice(4,6)),
@@ -46,7 +45,6 @@ function processData(series: ProductDailySeries[], tab: string) {
   }
 
   if (tab === "위클리") {
-    // 최근 90일 1일 단위
     const filtered = all.filter(r => diffDays(r.dt) < 90);
     return {
       labels: filtered.map(r => r.dt.slice(2,4) + "/" + r.dt.slice(4,6)),
@@ -57,7 +55,6 @@ function processData(series: ProductDailySeries[], tab: string) {
   }
 
   if (tab === "먼슬리") {
-    // 전체 데이터 3일 단위 샘플링
     const labels: string[] = [];
     const ordData: number[] = [];
     const smpData: number[] = [];
@@ -91,17 +88,15 @@ function processData(series: ProductDailySeries[], tab: string) {
   return { labels, ordData, smpData, revData };
 }
 
-export default function ProductDetailChart({ series }: Props) {
-  const [activeTab, setActiveTab] = useState("데일리");
+function OrderRevenueChart({ labels, ordData, revData }: {
+  labels: string[]; ordData: number[]; revData: number[];
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
-
-  const { labels, ordData, smpData, revData } = processData(series, activeTab);
 
   useEffect(() => {
     if (!canvasRef.current || !labels.length) return;
     chartRef.current?.destroy();
-
     chartRef.current = new Chart(canvasRef.current, {
       type: "line",
       data: {
@@ -112,10 +107,7 @@ export default function ProductDetailChart({ series }: Props) {
             data: ordData,
             borderColor: "#3b82f6",
             backgroundColor: "rgba(59,130,246,0.07)",
-            borderWidth: 2,
-            pointRadius: 2,
-            fill: true,
-            tension: 0.35,
+            borderWidth: 2, pointRadius: 2, fill: true, tension: 0.35,
             yAxisID: "yLeft",
           },
           {
@@ -123,102 +115,99 @@ export default function ProductDetailChart({ series }: Props) {
             data: revData,
             borderColor: "#8b5cf6",
             backgroundColor: "transparent",
-            borderWidth: 1.5,
-            pointRadius: 2,
-            fill: false,
-            tension: 0.35,
+            borderWidth: 1.5, pointRadius: 2, fill: false, tension: 0.35,
             yAxisID: "yRight",
-          },
-          {
-            label: "샘플 출고",
-            data: smpData,
-            borderColor: "#10b981",
-            borderDash: [5, 4],
-            backgroundColor: "transparent",
-            borderWidth: 1.5,
-            pointRadius: 2,
-            fill: false,
-            tension: 0.35,
-            yAxisID: "yLeft",
           },
         ],
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive: true, maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         plugins: {
-          legend: {
-            display: true,
-            position: "bottom",
-            labels: { font: { size: 11 }, color: "#64748b", boxWidth: 20, boxHeight: 2, padding: 14 },
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const v = ctx.raw as number;
-                if (ctx.dataset.label === "매출(KRW)") return ` 매출: ₩${(v/1e6).toFixed(1)}M`;
-                return ` ${ctx.dataset.label}: ${v.toLocaleString()}`;
-              },
-            },
-          },
+          legend: { display: true, position: "bottom", labels: { font: { size: 11 }, color: "#64748b", boxWidth: 20, boxHeight: 2, padding: 14 } },
+          tooltip: { callbacks: { label: (ctx) => {
+            const v = ctx.raw as number;
+            if (ctx.dataset.label === "매출(KRW)") return ` 매출: ₩${(v/1e6).toFixed(1)}M`;
+            return ` 주문수: ${v.toLocaleString()}`;
+          }}},
         },
         scales: {
-          x: {
-            ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true },
-            grid: { color: "#e2e6ea", lineWidth: 0.5 },
-          },
-          yLeft: {
-            position: "left",
-            ticks: { color: "#3b82f6", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() },
-            grid: { color: "#e2e6ea", lineWidth: 0.5 },
-          },
-          yRight: {
-            position: "right",
-            ticks: { color: "#8b5cf6", font: { size: 10 }, callback: (v) => (v as number / 1e6).toFixed(0) + "M" },
-            grid: { display: false },
-          },
+          x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
+          yLeft: { position: "left", ticks: { color: "#3b82f6", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
+          yRight: { position: "right", ticks: { color: "#8b5cf6", font: { size: 10 }, callback: (v) => (v as number / 1e6).toFixed(0) + "M" }, grid: { display: false } },
         },
       },
     });
     return () => { chartRef.current?.destroy(); };
-  }, [labels, ordData, smpData, revData]);
+  }, [labels, ordData, revData]);
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.header}><div className={styles.title}>주문수 & 매출</div></div>
+      <div style={{ position: "relative", height: 220 }}><canvas ref={canvasRef} /></div>
+    </div>
+  );
+}
+
+function SampleChart({ labels, smpData }: { labels: string[]; smpData: number[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !labels.length) return;
+    chartRef.current?.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label: "샘플 출고수",
+          data: smpData,
+          backgroundColor: "#10b981aa",
+          borderRadius: 3,
+          borderSkipped: "bottom",
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true }, grid: { display: false } },
+          y: { ticks: { color: "#10b981", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
+        },
+      },
+    });
+    return () => { chartRef.current?.destroy(); };
+  }, [labels, smpData]);
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.header}><div className={styles.title}>샘플 출고수</div></div>
+      <div style={{ position: "relative", height: 220 }}><canvas ref={canvasRef} /></div>
+    </div>
+  );
+}
+
+export default function ProductDetailChart({ series }: Props) {
+  const [activeTab, setActiveTab] = useState("데일리");
+  const { labels, ordData, smpData, revData } = processData(series, activeTab);
 
   return (
     <div style={{ marginTop: 24 }}>
-      {/* 탭 */}
       <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
         {TABS.map(t => (
-          <button
-            key={t}
-            onClick={() => setActiveTab(t)}
-            style={{
-              fontSize: 12, padding: "5px 14px",
-              borderRadius: 6, border: "1px solid",
-              borderColor: activeTab === t ? "#3b82f6" : "#e2e6ea",
-              background: activeTab === t ? "#3b82f6" : "#fff",
-              color: activeTab === t ? "#fff" : "#64748b",
-              cursor: "pointer", fontWeight: activeTab === t ? 600 : 400,
-            }}
-          >
-            {t}
-          </button>
+          <button key={t} onClick={() => setActiveTab(t)} style={{
+            fontSize: 12, padding: "5px 14px", borderRadius: 6, border: "1px solid",
+            borderColor: activeTab === t ? "#3b82f6" : "#e2e6ea",
+            background: activeTab === t ? "#3b82f6" : "#fff",
+            color: activeTab === t ? "#fff" : "#64748b",
+            cursor: "pointer", fontWeight: activeTab === t ? 600 : 400,
+          }}>{t}</button>
         ))}
       </div>
-
-      {/* 차트 */}
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <div className={styles.title}>
-            {activeTab === "데일리" && "주문수 · 매출 · 샘플 출고 추이 (최근 14일)"}
-            {activeTab === "위클리" && "주문수 · 매출 · 샘플 출고 추이 (최근 90일)"}
-            {activeTab === "먼슬리" && "주문수 · 매출 · 샘플 출고 추이 (3일 간격)"}
-            {activeTab === "전체" && "주문수 · 매출 · 샘플 출고 추이 (월별)"}
-          </div>
-        </div>
-        <div style={{ position: "relative", height: 280 }}>
-          <canvas ref={canvasRef} />
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <OrderRevenueChart labels={labels} ordData={ordData} revData={revData} />
+        <SampleChart labels={labels} smpData={smpData} />
       </div>
     </div>
   );
