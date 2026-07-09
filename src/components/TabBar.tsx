@@ -5,7 +5,7 @@ import styles from "./TabBar.module.css";
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
   { icon: "📦", label: "제품별 매출", href: "/dashboard/products" },
-  { icon: "📅", label: "월간 분석", href: "/dashboard" },
+  { icon: "📅", label: "월간 분석", href: "/dashboard/monthly" },
 ];
 
 interface Props {
@@ -19,9 +19,13 @@ export default function TabBar({ activeTab }: Props) {
   return (
     <div className={styles.bar}>
       {TABS.map((t) => {
-        const isActive = activeTab
-          ? activeTab === t.label
-          : pathname === t.href;
+        let isActive = false;
+        if (activeTab) {
+          isActive = activeTab === t.label;
+        } else {
+          // 정확히 일치하는 경우만 active
+          isActive = pathname === t.href;
+        }
         return (
           <div
             key={t.label}
