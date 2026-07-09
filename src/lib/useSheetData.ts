@@ -10,7 +10,7 @@ export interface ProductTop10Item {
 export interface SheetData {
   daily: DailyRow[];
   productTop10ByPeriod: {
-    "3": ProductTop10Item[];
+    "1": ProductTop10Item[];
     "7": ProductTop10Item[];
     "30": ProductTop10Item[];
     "90": ProductTop10Item[];
