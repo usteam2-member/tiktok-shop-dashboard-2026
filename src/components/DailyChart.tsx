@@ -11,10 +11,10 @@ interface Props {
   activeQuick: number | null;
 }
 
-function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
+function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 3일, 7일 → 1일 단위
+  // 3일, 7일 → 1일 단위 (전체 표시)
   if (activeQuick === 3 || activeQuick === 7) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -22,33 +22,22 @@ function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: 
     };
   }
 
-  // 30일, 90일 → 10일 단위
+  // 30일, 90일 → 10일 간격으로 샘플링
   if (activeQuick === 30 || activeQuick === 90) {
-    const grouped: DailyRow[] = [];
+    const sampled: DailyRow[] = [];
     const labels: string[] = [];
     for (let i = 0; i < data.length; i += 10) {
-      const chunk = data.slice(i, i + 10);
-      labels.push(chunk[0].dt.slice(2, 4) + "/" + chunk[0].dt.slice(4, 6));
-      grouped.push({
-        dt: chunk[0].dt,
-        krw: chunk.reduce((a, r) => a + r.krw, 0),
-        ord: chunk.reduce((a, r) => a + r.ord, 0),
-        smp: chunk.reduce((a, r) => a + r.smp, 0),
-        aff: chunk.reduce((a, r) => a + r.aff, 0),
-        adCost: chunk.reduce((a, r) => a + r.adCost, 0),
-        roas: chunk.reduce((a, r) => a + r.roas, 0) / chunk.length,
-        unitPriceUsd: chunk.reduce((a, r) => a + r.unitPriceUsd, 0) / chunk.length,
-      });
+      sampled.push(data[i]);
+      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
     }
-    return { labels, rows: grouped };
+    return { labels, rows: sampled };
   }
 
-  // 전체(null) → 월별
-  const monthMap: Record<string, DailyRow[]> = {};
+  // 전체(null) → 매월 1일 데이터만 표시
+  const monthMap: Record<string, DailyRow> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
-    if (!monthMap[m]) monthMap[m] = [];
-    monthMap[m].push(r);
+    if (!monthMap[m]) monthMap[m] = r; // 해당 월 첫 번째 데이터
   }
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
@@ -57,18 +46,9 @@ function aggregateData(data: DailyRow[], activeQuick: number | null): { labels: 
   };
   const labels: string[] = [];
   const rows: DailyRow[] = [];
-  for (const [m, chunk] of Object.entries(monthMap)) {
+  for (const [m, row] of Object.entries(monthMap)) {
     labels.push(MONTH_LABEL[m] || m);
-    rows.push({
-      dt: chunk[0].dt,
-      krw: chunk.reduce((a, r) => a + r.krw, 0),
-      ord: chunk.reduce((a, r) => a + r.ord, 0),
-      smp: chunk.reduce((a, r) => a + r.smp, 0),
-      aff: chunk.reduce((a, r) => a + r.aff, 0),
-      adCost: chunk.reduce((a, r) => a + r.adCost, 0),
-      roas: chunk.reduce((a, r) => a + r.roas, 0) / chunk.length,
-      unitPriceUsd: chunk.reduce((a, r) => a + r.unitPriceUsd, 0) / chunk.length,
-    });
+    rows.push(row);
   }
   return { labels, rows };
 }
@@ -133,12 +113,12 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 }
 
 export default function DailyCharts({ data, activeQuick }: Props) {
-  const { labels, rows } = aggregateData(data, activeQuick);
+  const { labels, rows } = sampleData(data, activeQuick);
 
   const periodLabel = activeQuick === 3 ? "최근 3일 (1일 단위)" :
     activeQuick === 7 ? "최근 7일 (1일 단위)" :
-    activeQuick === 30 ? "최근 30일 (10일 단위)" :
-    activeQuick === 90 ? "최근 90일 (10일 단위)" : "전체 (월별)";
+    activeQuick === 30 ? "최근 30일 (10일 간격)" :
+    activeQuick === 90 ? "최근 90일 (10일 간격)" : "전체 (월별)";
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
@@ -148,8 +128,8 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toLocaleString()}
         datasets={[
-          { label: "매출(KRW)", data: rows.map(r => r.krw), borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.07)", borderWidth: 2, pointRadius: 2, fill: true, tension: 0.35, yAxisID: "yLeft" },
-          { label: "주문수", data: rows.map(r => r.ord), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 2, fill: false, tension: 0.35, yAxisID: "yRight" },
+          { label: "매출(KRW)", data: rows.map(r => r.krw), borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
+          { label: "주문수", data: rows.map(r => r.ord), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
         ]}
       />
       <LineChart
@@ -158,8 +138,8 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         yLeftCb={(v) => v.toLocaleString()}
         yRightCb={(v) => v.toLocaleString()}
         datasets={[
-          { label: "소재 업로드", data: rows.map(r => r.aff), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.07)", borderWidth: 2, pointRadius: 2, fill: true, tension: 0.35, yAxisID: "yLeft" },
-          { label: "샘플 출고", data: rows.map(r => r.smp), borderColor: "#ef4444", borderDash: [5, 4], backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 2, fill: false, tension: 0.35, yAxisID: "yRight" },
+          { label: "소재 업로드", data: rows.map(r => r.aff), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
+          { label: "샘플 출고", data: rows.map(r => r.smp), borderColor: "#ef4444", borderDash: [5, 4], backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
         ]}
       />
       <LineChart
@@ -168,8 +148,8 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toFixed(0) + "%"}
         datasets={[
-          { label: "광고비(KRW)", data: rows.map(r => r.adCost), borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 2, pointRadius: 2, fill: true, tension: 0.35, yAxisID: "yLeft" },
-          { label: "ROAS", data: rows.map(r => r.roas), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 2, fill: false, tension: 0.35, yAxisID: "yRight" },
+          { label: "광고비(KRW)", data: rows.map(r => r.adCost), borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
+          { label: "ROAS", data: rows.map(r => r.roas), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
         ]}
       />
       <LineChart
@@ -177,7 +157,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         labels={labels}
         yLeftCb={(v) => "$" + v.toFixed(1)}
         datasets={[
-          { label: "객단가(USD)", data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 2, fill: true, tension: 0.35, yAxisID: "yLeft" },
+          { label: "객단가(USD)", data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
         ]}
       />
     </div>
