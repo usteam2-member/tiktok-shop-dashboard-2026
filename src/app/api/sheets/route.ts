@@ -41,6 +41,19 @@ async function fetchSheet(name: string) {
   return parseCSV(await res.text());
 }
 
+// "SB0791_US 딥클세럼 매출액(KRW)" → "딥클세럼"
+function extractName(cell: string): string {
+  return cell
+    .replace(/매출액\(KRW\)/g, "")
+    .replace(/주문수/g, "")
+    .replace(/샘플출고수/g, "")
+    .replace(/[A-Z0-9]+_US/g, "")
+    .replace(/BD\w+/g, "")
+    .replace(/\d{10,}/g, "") // 긴 숫자 PID 제거
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export async function GET() {
   try {
     // ── GMV | Daily ──────────────────────────────────────────────
@@ -69,43 +82,29 @@ export async function GET() {
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
 
-    // 디버그: 첫 8행, 첫 15컬럼만
-    const debugRows = prodRows.slice(0, 8).map(r => r.slice(0, 15));
-
-    // 모든 행을 스캔해서 제품명 + 매출액(KRW) 헤더 찾기
-    const productCols: { name: string; col: number }[] = [];
     const MONTH_LABEL: Record<string, string> = {
       "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
       "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
-    // 헤더 행 찾기: "매출액(KRW)"이 가장 많이 나오는 행
+    // 헤더 행 찾기: "매출액(KRW)"를 포함하는 셀이 가장 많은 행
     let bestHeaderRow = -1;
     let maxCount = 0;
-    for (let i = 0; i < Math.min(10, prodRows.length); i++) {
-      const count = prodRows[i].filter(c => c.trim() === "매출액(KRW)").length;
+    for (let i = 0; i < Math.min(15, prodRows.length); i++) {
+      const count = prodRows[i].filter(c => c.includes("매출액(KRW)")).length;
       if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
     }
 
-    // 제품명 행은 헤더 행 바로 위
-    const nameRowIdx = bestHeaderRow - 1;
-    const headerRowIdx = bestHeaderRow;
+    const productCols: { name: string; col: number }[] = [];
 
-    if (nameRowIdx >= 0 && headerRowIdx >= 0) {
-      const nameRow = prodRows[nameRowIdx] || [];
-      const headerRow = prodRows[headerRowIdx] || [];
-      let lastName = "";
-
-      for (let c = 2; c < nameRow.length; c++) {
-        const n = (nameRow[c] || "").trim();
-        if (n && n !== "매출액(KRW)" && n !== "주문수" && n !== "샘플출고수") {
-          lastName = n;
-        }
-        const h = (headerRow[c] || "").trim();
-        if (h === "매출액(KRW)" && lastName) {
-          productCols.push({ name: lastName, col: c });
-        }
+    if (bestHeaderRow >= 0) {
+      const headerRow = prodRows[bestHeaderRow] || [];
+      for (let c = 2; c < headerRow.length; c++) {
+        const cell = (headerRow[c] || "").trim();
+        if (!cell.includes("매출액(KRW)")) continue;
+        const name = extractName(cell);
+        if (name) productCols.push({ name, col: c });
       }
     }
 
@@ -117,7 +116,7 @@ export async function GET() {
       productMonthOrders[name] = {};
     }
 
-    // 데이터 행: 헤더 다음 행부터
+    // 데이터 행: 헤더 다음부터 일별 데이터만
     for (const row of prodRows.slice(bestHeaderRow + 1)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
@@ -176,8 +175,7 @@ export async function GET() {
     return NextResponse.json({
       daily, top15, monthlyTop10, sojae,
       availableMonths: Object.keys(monthlyTop10),
-      debugRows,
-      debugInfo: { bestHeaderRow, nameRowIdx, productColsCount: productCols.length },
+      debugInfo: { bestHeaderRow, productColsCount: productCols.length },
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
