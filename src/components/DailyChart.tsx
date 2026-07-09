@@ -22,7 +22,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
 
-  // 30일 → 3일 간격 샘플링
+  // 30일 → 3일 간격
   if (activeQuick === 30) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
@@ -33,7 +33,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 90일 → 10일 간격 샘플링
+  // 90일 → 10일 간격
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
@@ -44,23 +44,31 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 전체(null) → 매월 첫 번째 데이터
-  const monthMap: Record<string, DailyRow> = {};
-  for (const r of data) {
-    const m = r.dt.slice(0, 4);
-    if (!monthMap[m]) monthMap[m] = r;
-  }
+  // 전체(null) → 월별 평균
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
     "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
+
+  const monthMap: Record<string, DailyRow[]> = {};
+  for (const r of data) {
+    const m = r.dt.slice(0, 4);
+    if (!monthMap[m]) monthMap[m] = [];
+    monthMap[m].push(r);
+  }
+
   const labels: string[] = [];
   const rows: DailyRow[] = [];
-  for (const [m, row] of Object.entries(monthMap)) {
+
+  for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
-    rows.push(row);
+    // 월별 중간값 (15일쯤 데이터)
+    const mid = chunk[Math.floor(chunk.length / 2)];
+    rows.push(mid);
   }
+
   return { labels, rows };
 }
 
