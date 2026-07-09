@@ -153,7 +153,6 @@ export async function GET() {
       }
     }
 
-    // 일별 데이터 집계
     const productDailyOrders: Record<string, Record<string, number>> = {};
     const productDailySamples: Record<string, Record<string, number>> = {};
     const productDailyRevenue: Record<string, Record<string, number>> = {};
@@ -177,7 +176,6 @@ export async function GET() {
       }
     }
 
-    // 제품별 요약 + 일별 시계열
     const products = productCols.map(({ name, pid, sku }) => {
       const ordByDay = productDailyOrders[name] || {};
       const smpByDay = productDailySamples[name] || {};
@@ -190,20 +188,21 @@ export async function GET() {
         return diff < days ? a + v : a;
       }, 0);
 
-      // 일별 시계열 데이터 (최근 90일)
-      const dailySeries = Object.keys(ordByDay)
+      // 전체 일별 시계열 (제한 없음)
+      const allDts = new Set([
+        ...Object.keys(ordByDay),
+        ...Object.keys(smpByDay),
+        ...Object.keys(revByDay),
+      ]);
+      const dailySeries = Array.from(allDts)
         .sort()
-        .filter(dt => {
-          const y = 2000+parseInt(dt.slice(0,2)), m = parseInt(dt.slice(2,4))-1, d = parseInt(dt.slice(4,6));
-          const diff = Math.round((lastDate.getTime() - new Date(y,m,d).getTime()) / 86400000);
-          return diff < 90;
-        })
         .map(dt => ({
           dt,
           ord: ordByDay[dt] || 0,
           smp: smpByDay[dt] || 0,
           rev: revByDay[dt] || 0,
-        }));
+        }))
+        .filter(r => r.ord > 0 || r.smp > 0 || r.rev > 0);
 
       return {
         name, pid, sku,
