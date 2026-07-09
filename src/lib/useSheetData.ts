@@ -1,17 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
-import { DailyRow, ProductRow, SojaeRow } from "./data";
+import { DailyRow, SojaeRow } from "./data";
 
-export interface MonthlyTop10Item {
+export interface ProductTop10Item {
   name: string;
   orders: number;
 }
 
 export interface SheetData {
   daily: DailyRow[];
-  top15: ProductRow[];
-  monthlyTop10: Record<string, MonthlyTop10Item[]>;
-  availableMonths: string[];
+  productTop10ByPeriod: {
+    "3": ProductTop10Item[];
+    "7": ProductTop10Item[];
+    "30": ProductTop10Item[];
+    "90": ProductTop10Item[];
+    "all": ProductTop10Item[];
+  };
   sojae: SojaeRow[];
   updatedAt: string;
 }
