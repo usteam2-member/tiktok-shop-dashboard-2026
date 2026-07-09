@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { DailyRow, ProductRow, SojaeRow } from "./data";
 
-export interface ThisMonthProduct {
+export interface MonthlyTop10Item {
   name: string;
   orders: number;
 }
@@ -10,7 +10,8 @@ export interface ThisMonthProduct {
 export interface SheetData {
   daily: DailyRow[];
   top15: ProductRow[];
-  thisMonthTop10: ThisMonthProduct[];
+  monthlyTop10: Record<string, MonthlyTop10Item[]>;
+  availableMonths: string[];
   sojae: SojaeRow[];
   updatedAt: string;
 }
