@@ -122,7 +122,6 @@ export async function GET() {
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
-    // 헤더 찾기
     let bestHeaderRow = -1;
     let maxCount = 0;
     for (let i = 0; i < Math.min(15, prodRows.length); i++) {
@@ -130,7 +129,6 @@ export async function GET() {
       if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
     }
 
-    // PID는 row[0], SKU는 row[1]에서 찾기
     const pidRow = prodRows[0] || [];
     const skuRow = prodRows[1] || [];
 
@@ -138,14 +136,11 @@ export async function GET() {
 
     if (bestHeaderRow >= 0) {
       const headerRow = prodRows[bestHeaderRow] || [];
-      // 컬럼별로 매출액(KRW) 포함된 것 찾기
       for (let c = 2; c < headerRow.length; c++) {
         const cell = (headerRow[c] || "").trim();
         if (!cell.includes("매출액(KRW)")) continue;
         const name = extractName(cell);
         if (!name) continue;
-
-        // 해당 컬럼 근처에서 PID, SKU 찾기
         let pid = "";
         let sku = "";
         for (let back = c; back >= Math.max(0, c - 4); back--) {
@@ -154,7 +149,6 @@ export async function GET() {
           if (!pid && /^\d{10,}$/.test(pidVal)) pid = pidVal;
           if (!sku && /[A-Z]+\d+_[A-Z]+/.test(skuVal)) sku = skuVal;
         }
-
         productCols.push({ name, pid, sku, col: c });
       }
     }
@@ -162,27 +156,32 @@ export async function GET() {
     // 일별 데이터 집계
     const productDailyOrders: Record<string, Record<string, number>> = {};
     const productDailySamples: Record<string, Record<string, number>> = {};
+    const productDailyRevenue: Record<string, Record<string, number>> = {};
 
     for (const { name } of productCols) {
       productDailyOrders[name] = {};
       productDailySamples[name] = {};
+      productDailyRevenue[name] = {};
     }
 
     for (const row of prodRows.slice(bestHeaderRow + 1)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
       for (const { name, col } of productCols) {
+        const rev = safeNum(row[col] || "0");
         const ord = safeNum(row[col + 1] || "0");
         const smp = safeNum(row[col + 2] || "0");
+        if (rev > 0) productDailyRevenue[name][dtRaw] = (productDailyRevenue[name][dtRaw] || 0) + rev;
         if (ord > 0) productDailyOrders[name][dtRaw] = (productDailyOrders[name][dtRaw] || 0) + ord;
         if (smp > 0) productDailySamples[name][dtRaw] = (productDailySamples[name][dtRaw] || 0) + smp;
       }
     }
 
-    // 제품별 요약
+    // 제품별 요약 + 일별 시계열
     const products = productCols.map(({ name, pid, sku }) => {
       const ordByDay = productDailyOrders[name] || {};
       const smpByDay = productDailySamples[name] || {};
+      const revByDay = productDailyRevenue[name] || {};
 
       const calcOrd = (days: number | null) => Object.entries(ordByDay).reduce((a, [dt, v]) => {
         if (days === null) return a + v;
@@ -190,6 +189,21 @@ export async function GET() {
         const diff = Math.round((lastDate.getTime() - new Date(y,m,d).getTime()) / 86400000);
         return diff < days ? a + v : a;
       }, 0);
+
+      // 일별 시계열 데이터 (최근 90일)
+      const dailySeries = Object.keys(ordByDay)
+        .sort()
+        .filter(dt => {
+          const y = 2000+parseInt(dt.slice(0,2)), m = parseInt(dt.slice(2,4))-1, d = parseInt(dt.slice(4,6));
+          const diff = Math.round((lastDate.getTime() - new Date(y,m,d).getTime()) / 86400000);
+          return diff < 90;
+        })
+        .map(dt => ({
+          dt,
+          ord: ordByDay[dt] || 0,
+          smp: smpByDay[dt] || 0,
+          rev: revByDay[dt] || 0,
+        }));
 
       return {
         name, pid, sku,
@@ -200,6 +214,7 @@ export async function GET() {
         smpThisMonth: Object.entries(smpByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
         newSojae: 0,
         revSojae: 0,
+        dailySeries,
       };
     });
 
