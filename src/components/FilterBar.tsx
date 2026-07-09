@@ -11,7 +11,7 @@ interface FilterBarProps {
 }
 
 const QUICK = [
-  { label: "3일", days: 3 },
+  { label: "오늘", days: 1 },
   { label: "7일", days: 7 },
   { label: "30일", days: 30 },
   { label: "90일", days: 90 },
@@ -44,7 +44,7 @@ export default function FilterBar({
           className={styles.dateInput}
           value={startDate}
           min="2026-01-01"
-          max="2026-07-31"
+          max="2026-12-31"
           onChange={(e) => onStartChange(e.target.value)}
         />
         <span className={styles.sep}>~</span>
@@ -53,7 +53,7 @@ export default function FilterBar({
           className={styles.dateInput}
           value={endDate}
           min="2026-01-01"
-          max="2026-07-31"
+          max="2026-12-31"
           onChange={(e) => onEndChange(e.target.value)}
         />
       </div>
