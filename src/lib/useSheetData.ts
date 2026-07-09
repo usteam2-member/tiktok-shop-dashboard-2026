@@ -7,6 +7,19 @@ export interface ProductTop10Item {
   orders: number;
 }
 
+export interface ProductItem {
+  name: string;
+  pid: string;
+  sku: string;
+  ordToday: number;
+  ord7: number;
+  ord30: number;
+  ordThisMonth: number;
+  smpThisMonth: number;
+  newSojae: number;
+  revSojae: number;
+}
+
 export interface SheetData {
   daily: DailyRow[];
   productTop10ByPeriod: {
@@ -16,6 +29,7 @@ export interface SheetData {
     "90": ProductTop10Item[];
     "all": ProductTop10Item[];
   };
+  products: ProductItem[];
   sojae: SojaeRow[];
   updatedAt: string;
 }
