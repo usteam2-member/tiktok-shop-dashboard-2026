@@ -14,7 +14,7 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 3일, 7일 → 1일 단위 (전체 표시)
+  // 3일, 7일 → 1일 단위
   if (activeQuick === 3 || activeQuick === 7) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -22,8 +22,19 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
 
-  // 30일, 90일 → 10일 간격으로 샘플링
-  if (activeQuick === 30 || activeQuick === 90) {
+  // 30일 → 3일 간격 샘플링
+  if (activeQuick === 30) {
+    const sampled: DailyRow[] = [];
+    const labels: string[] = [];
+    for (let i = 0; i < data.length; i += 3) {
+      sampled.push(data[i]);
+      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
+    }
+    return { labels, rows: sampled };
+  }
+
+  // 90일 → 10일 간격 샘플링
+  if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
     for (let i = 0; i < data.length; i += 10) {
@@ -33,11 +44,11 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 전체(null) → 매월 1일 데이터만 표시
+  // 전체(null) → 매월 첫 번째 데이터
   const monthMap: Record<string, DailyRow> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
-    if (!monthMap[m]) monthMap[m] = r; // 해당 월 첫 번째 데이터
+    if (!monthMap[m]) monthMap[m] = r;
   }
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
@@ -117,7 +128,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
 
   const periodLabel = activeQuick === 3 ? "최근 3일 (1일 단위)" :
     activeQuick === 7 ? "최근 7일 (1일 단위)" :
-    activeQuick === 30 ? "최근 30일 (10일 간격)" :
+    activeQuick === 30 ? "최근 30일 (3일 간격)" :
     activeQuick === 90 ? "최근 90일 (10일 간격)" : "전체 (월별)";
 
   return (
