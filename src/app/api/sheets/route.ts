@@ -69,34 +69,45 @@ export async function GET() {
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
 
-    // 헤더 구조 파악
-    // row[2]: "SB0791_US 세럼 매출액(KRW)" 형태 (CSV에서 병합셀 풀린 것)
-    // row[3]: 제품명 (세럼, 크림 등)
-    // row[4]: 매출액(KRW) / 주문수 / 샘플출고수
-    // row[5~]: 데이터 (월별 합계 + 일별)
+    // 디버그: 첫 8행, 첫 15컬럼만
+    const debugRows = prodRows.slice(0, 8).map(r => r.slice(0, 15));
 
-    const nameRow = prodRows[3] || [];
-    const headerRow = prodRows[4] || [];
-
+    // 모든 행을 스캔해서 제품명 + 매출액(KRW) 헤더 찾기
     const productCols: { name: string; col: number }[] = [];
-    let lastName = "";
-
-    for (let c = 2; c < nameRow.length; c++) {
-      const n = (nameRow[c] || "").trim();
-      if (n && n !== "매출액(KRW)" && n !== "주문수" && n !== "샘플출고수") {
-        lastName = n;
-      }
-      const h = (headerRow[c] || "").trim();
-      if (h === "매출액(KRW)" && lastName) {
-        productCols.push({ name: lastName, col: c });
-      }
-    }
-
     const MONTH_LABEL: Record<string, string> = {
       "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
       "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
+
+    // 헤더 행 찾기: "매출액(KRW)"이 가장 많이 나오는 행
+    let bestHeaderRow = -1;
+    let maxCount = 0;
+    for (let i = 0; i < Math.min(10, prodRows.length); i++) {
+      const count = prodRows[i].filter(c => c.trim() === "매출액(KRW)").length;
+      if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
+    }
+
+    // 제품명 행은 헤더 행 바로 위
+    const nameRowIdx = bestHeaderRow - 1;
+    const headerRowIdx = bestHeaderRow;
+
+    if (nameRowIdx >= 0 && headerRowIdx >= 0) {
+      const nameRow = prodRows[nameRowIdx] || [];
+      const headerRow = prodRows[headerRowIdx] || [];
+      let lastName = "";
+
+      for (let c = 2; c < nameRow.length; c++) {
+        const n = (nameRow[c] || "").trim();
+        if (n && n !== "매출액(KRW)" && n !== "주문수" && n !== "샘플출고수") {
+          lastName = n;
+        }
+        const h = (headerRow[c] || "").trim();
+        if (h === "매출액(KRW)" && lastName) {
+          productCols.push({ name: lastName, col: c });
+        }
+      }
+    }
 
     const productTotals: Record<string, number> = {};
     const productMonthOrders: Record<string, Record<string, number>> = {};
@@ -106,8 +117,8 @@ export async function GET() {
       productMonthOrders[name] = {};
     }
 
-    // 일별 데이터만 읽기 (260101~ 형태)
-    for (const row of prodRows.slice(5)) {
+    // 데이터 행: 헤더 다음 행부터
+    for (const row of prodRows.slice(bestHeaderRow + 1)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       if (!isDt(dtRaw)) continue;
       const month = dtRaw.slice(0, 4);
@@ -129,12 +140,8 @@ export async function GET() {
       .slice(0, 15)
       .map(([name, total]) => ({ name, total }));
 
-    // 월별 TOP 10
     const allMonths = Array.from(
-      new Set(
-        Object.values(productMonthOrders)
-          .flatMap(mo => Object.keys(mo))
-      )
+      new Set(Object.values(productMonthOrders).flatMap(mo => Object.keys(mo)))
     ).sort();
 
     const monthlyTop10: Record<string, { name: string; orders: number }[]> = {};
@@ -169,6 +176,8 @@ export async function GET() {
     return NextResponse.json({
       daily, top15, monthlyTop10, sojae,
       availableMonths: Object.keys(monthlyTop10),
+      debugRows,
+      debugInfo: { bestHeaderRow, nameRowIdx, productColsCount: productCols.length },
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
