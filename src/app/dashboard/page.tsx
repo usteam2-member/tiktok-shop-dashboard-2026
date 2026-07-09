@@ -48,6 +48,9 @@ export default function DashboardPage() {
     let startD: Date;
     if (days === null) {
       startD = dtToDate(allDates[0].dt);
+    } else if (days === 1) {
+      // 오늘: 날짜 범위는 오늘 하루지만 차트는 7일치로
+      startD = new Date(endD);
     } else {
       startD = new Date(endD);
       startD.setDate(endD.getDate() - days + 1);
@@ -62,14 +65,28 @@ export default function DashboardPage() {
   const handleStart = (v: string) => { setStartDate(v); setActiveQuick(null); pushParams(v, endDate); };
   const handleEnd = (v: string) => { setEndDate(v); setActiveQuick(null); pushParams(startDate, v); };
 
-  const filteredData = useMemo(() => {
+  // KPI: 오늘이면 오늘 하루치, 나머지는 선택 기간
+  const kpiData = useMemo(() => {
     if (!data || !startDate || !endDate) return [];
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate]);
 
+  // 차트: 오늘이면 최근 7일치, 나머지는 선택 기간
+  const chartData = useMemo(() => {
+    if (!data) return [];
+    if (activeQuick === 1) {
+      const allDates = data.daily;
+      const lastDt = dtToDate(allDates[allDates.length - 1].dt);
+      const sevenAgo = new Date(lastDt);
+      sevenAgo.setDate(lastDt.getDate() - 6);
+      return filterByRange(fmt(sevenAgo), fmt(lastDt), allDates);
+    }
+    return filterByRange(startDate, endDate, data.daily);
+  }, [data, startDate, endDate, activeQuick]);
+
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    if (activeQuick === 1) return data.productTop10ByPeriod["3"].slice(0, 10);
+    if (activeQuick === 1) return data.productTop10ByPeriod["7"];
     if (activeQuick === 7) return data.productTop10ByPeriod["7"];
     if (activeQuick === 30) return data.productTop10ByPeriod["30"];
     if (activeQuick === 90) return data.productTop10ByPeriod["90"];
@@ -80,6 +97,9 @@ export default function DashboardPage() {
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
+
+  // 차트용 activeQuick (오늘이면 7일처럼 표시)
+  const chartActiveQuick = activeQuick === 1 ? 7 : activeQuick;
 
   return (
     <div className={styles.wrap}>
@@ -110,8 +130,8 @@ export default function DashboardPage() {
             <div className={styles.updateInfo}>
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
-            <KpiRow data={filteredData} />
-            <DailyCharts data={filteredData} activeQuick={activeQuick} />
+            <KpiRow data={kpiData} />
+            <DailyCharts data={chartData} activeQuick={chartActiveQuick} />
             <div className={styles.fullWidth}>
               <ThisMonthChart
                 data={top10Data}
