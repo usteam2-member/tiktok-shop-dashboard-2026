@@ -7,14 +7,12 @@ interface KpiRowProps {
 }
 
 export default function KpiRow({ data }: KpiRowProps) {
-  if (!data.length) return null;
-
   const totalKRW = data.reduce((a, r) => a + r.krw, 0);
   const totalOrd = data.reduce((a, r) => a + r.ord, 0);
   const totalSmp = data.reduce((a, r) => a + r.smp, 0);
   const totalAff = data.reduce((a, r) => a + r.aff, 0);
-  const avgKRW = totalKRW / data.length;
-  const avgOrd = totalOrd / data.length;
+  const avgKRW = data.length ? totalKRW / data.length : 0;
+  const avgOrd = data.length ? totalOrd / data.length : 0;
 
   const kpis = [
     { label: "총 매출", main: fmtKRW(totalKRW), sub: `일 평균 ${fmtKRW(avgKRW)}` },
