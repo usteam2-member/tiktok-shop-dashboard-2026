@@ -66,13 +66,17 @@ export async function GET() {
       if (!isDt(dtRaw)) continue;
       const krw = safeNum(row[9] || "0");
       const ord = safeNum(row[6] || "0");
-      const smp = safeNum(row[5] || "0");
-      const aff = safeNum(row[4] || "0");
-      const adCost = safeNum(row[11] || "0");
-      const roas = safeNum(row[16] || "0");
-      const unitPriceUsd = safeNum(row[17] || "0");
       if (krw === 0 && ord === 0) continue;
-      daily.push({ dt: dtRaw, krw, ord, smp, aff, adCost, roas, unitPriceUsd });
+      daily.push({
+        dt: dtRaw,
+        krw,
+        ord,
+        smp: safeNum(row[5] || "0"),
+        aff: safeNum(row[4] || "0"),
+        adCost: safeNum(row[11] || "0"),
+        roas: safeNum(row[16] || "0"),
+        unitPriceUsd: safeNum(row[17] || "0"),
+      });
     }
 
     // ── GMV | by Product ─────────────────────────────────────────
