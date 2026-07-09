@@ -105,6 +105,14 @@ export async function GET() {
       });
     }
 
+    const lastDt = daily[daily.length - 1]?.dt || "260101";
+    const thisMonth = lastDt.slice(0, 4);
+    const lastDate = new Date(
+      2000 + parseInt(lastDt.slice(0, 2)),
+      parseInt(lastDt.slice(2, 4)) - 1,
+      parseInt(lastDt.slice(4, 6))
+    );
+
     // ── GMV | by Product ─────────────────────────────────────────
     const prodRows = await fetchSheet("GMV | by Product");
 
@@ -114,6 +122,7 @@ export async function GET() {
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
+    // 헤더 찾기
     let bestHeaderRow = -1;
     let maxCount = 0;
     for (let i = 0; i < Math.min(15, prodRows.length); i++) {
@@ -121,20 +130,42 @@ export async function GET() {
       if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
     }
 
-    const productCols: { name: string; col: number }[] = [];
+    // PID는 row[0], SKU는 row[1]에서 찾기
+    const pidRow = prodRows[0] || [];
+    const skuRow = prodRows[1] || [];
+
+    const productCols: { name: string; pid: string; sku: string; col: number }[] = [];
+
     if (bestHeaderRow >= 0) {
       const headerRow = prodRows[bestHeaderRow] || [];
+      // 컬럼별로 매출액(KRW) 포함된 것 찾기
       for (let c = 2; c < headerRow.length; c++) {
         const cell = (headerRow[c] || "").trim();
         if (!cell.includes("매출액(KRW)")) continue;
         const name = extractName(cell);
-        if (name) productCols.push({ name, col: c });
+        if (!name) continue;
+
+        // 해당 컬럼 근처에서 PID, SKU 찾기
+        let pid = "";
+        let sku = "";
+        for (let back = c; back >= Math.max(0, c - 4); back--) {
+          const pidVal = (pidRow[back] || "").trim();
+          const skuVal = (skuRow[back] || "").trim();
+          if (!pid && /^\d{10,}$/.test(pidVal)) pid = pidVal;
+          if (!sku && /[A-Z]+\d+_[A-Z]+/.test(skuVal)) sku = skuVal;
+        }
+
+        productCols.push({ name, pid, sku, col: c });
       }
     }
 
+    // 일별 데이터 집계
     const productDailyOrders: Record<string, Record<string, number>> = {};
+    const productDailySamples: Record<string, Record<string, number>> = {};
+
     for (const { name } of productCols) {
       productDailyOrders[name] = {};
+      productDailySamples[name] = {};
     }
 
     for (const row of prodRows.slice(bestHeaderRow + 1)) {
@@ -142,18 +173,35 @@ export async function GET() {
       if (!isDt(dtRaw)) continue;
       for (const { name, col } of productCols) {
         const ord = safeNum(row[col + 1] || "0");
-        if (ord > 0) {
-          productDailyOrders[name][dtRaw] = (productDailyOrders[name][dtRaw] || 0) + ord;
-        }
+        const smp = safeNum(row[col + 2] || "0");
+        if (ord > 0) productDailyOrders[name][dtRaw] = (productDailyOrders[name][dtRaw] || 0) + ord;
+        if (smp > 0) productDailySamples[name][dtRaw] = (productDailySamples[name][dtRaw] || 0) + smp;
       }
     }
 
-    const lastDt = daily[daily.length - 1]?.dt || "260101";
-    const lastDate = new Date(
-      2000 + parseInt(lastDt.slice(0, 2)),
-      parseInt(lastDt.slice(2, 4)) - 1,
-      parseInt(lastDt.slice(4, 6))
-    );
+    // 제품별 요약
+    const products = productCols.map(({ name, pid, sku }) => {
+      const ordByDay = productDailyOrders[name] || {};
+      const smpByDay = productDailySamples[name] || {};
+
+      const calcOrd = (days: number | null) => Object.entries(ordByDay).reduce((a, [dt, v]) => {
+        if (days === null) return a + v;
+        const y = 2000+parseInt(dt.slice(0,2)), m = parseInt(dt.slice(2,4))-1, d = parseInt(dt.slice(4,6));
+        const diff = Math.round((lastDate.getTime() - new Date(y,m,d).getTime()) / 86400000);
+        return diff < days ? a + v : a;
+      }, 0);
+
+      return {
+        name, pid, sku,
+        ordToday: ordByDay[lastDt] || 0,
+        ord7: calcOrd(7),
+        ord30: calcOrd(30),
+        ordThisMonth: Object.entries(ordByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
+        smpThisMonth: Object.entries(smpByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
+        newSojae: 0,
+        revSojae: 0,
+      };
+    });
 
     const productTop10ByPeriod = {
       "1": getTopByDays(productDailyOrders, lastDate, 1),
@@ -181,7 +229,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      daily, productTop10ByPeriod, sojae,
+      daily, productTop10ByPeriod, products, sojae,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
