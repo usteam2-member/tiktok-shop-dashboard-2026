@@ -14,8 +14,8 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 3일, 7일 → 1일 단위
-  if (activeQuick === 3 || activeQuick === 7) {
+  // 오늘, 7일 → 1일 단위
+  if (activeQuick === 1 || activeQuick === 7) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
       rows: data,
@@ -33,18 +33,18 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 90일 → 10일 간격
+  // 90일 → 5일 간격
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 10) {
+    for (let i = 0; i < data.length; i += 5) {
       sampled.push(data[i]);
       labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
     }
     return { labels, rows: sampled };
   }
 
-  // 전체(null) → 월별 평균
+  // 전체(null) → 월별 중간값
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
     "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
@@ -60,15 +60,11 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 
   const labels: string[] = [];
   const rows: DailyRow[] = [];
-
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
-    // 월별 중간값 (15일쯤 데이터)
-    const mid = chunk[Math.floor(chunk.length / 2)];
-    rows.push(mid);
+    rows.push(chunk[Math.floor(chunk.length / 2)]);
   }
-
   return { labels, rows };
 }
 
@@ -134,10 +130,10 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 export default function DailyCharts({ data, activeQuick }: Props) {
   const { labels, rows } = sampleData(data, activeQuick);
 
-  const periodLabel = activeQuick === 3 ? "최근 3일 (1일 단위)" :
+  const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
     activeQuick === 7 ? "최근 7일 (1일 단위)" :
     activeQuick === 30 ? "최근 30일 (3일 간격)" :
-    activeQuick === 90 ? "최근 90일 (10일 간격)" : "전체 (월별)";
+    activeQuick === 90 ? "최근 90일 (5일 간격)" : "전체 (월별)";
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
