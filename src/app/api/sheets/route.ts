@@ -122,30 +122,11 @@ export async function GET() {
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
-    // 헤더 행 찾기
     let bestHeaderRow = -1;
     let maxCount = 0;
     for (let i = 0; i < Math.min(15, prodRows.length); i++) {
       const count = prodRows[i].filter(c => c.includes("매출액(KRW)")).length;
       if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
-    }
-
-    // PID: 헤더행에서 긴 숫자가 포함된 셀에서 추출
-    // 각 컬럼의 PID를 미리 매핑
-    const colPidMap: Record<number, string> = {};
-    const colSkuMap: Record<number, string> = {};
-
-    if (bestHeaderRow >= 0) {
-      const headerRow = prodRows[bestHeaderRow] || [];
-      for (let c = 2; c < headerRow.length; c++) {
-        const cell = (headerRow[c] || "").trim();
-        // PID: 10자리 이상 숫자
-        const pidMatch = cell.match(/\d{10,}/);
-        if (pidMatch) colPidMap[c] = pidMatch[0];
-        // SKU: 대문자+숫자+_US 패턴
-        const skuMatch = cell.match(/[A-Z0-9]+_[A-Z]+/);
-        if (skuMatch) colSkuMap[c] = skuMatch[0];
-      }
     }
 
     const productCols: { name: string; pid: string; sku: string; col: number }[] = [];
@@ -158,20 +139,18 @@ export async function GET() {
         const name = extractName(cell);
         if (!name) continue;
 
-        // 같은 컬럼 or 근처에서 PID/SKU 찾기
-        let pid = colPidMap[c] || "";
-        let sku = colSkuMap[c] || "";
-        if (!pid) {
-          for (let back = c - 1; back >= Math.max(0, c - 3); back--) {
-            if (colPidMap[back]) { pid = colPidMap[back]; break; }
-          }
-        }
-        if (!sku) {
-          for (let back = c - 1; back >= Math.max(0, c - 3); back--) {
-            if (colSkuMap[back]) { sku = colSkuMap[back]; break; }
-          }
-        }
+        const pidMatch = cell.match(/\d{10,}/);
+        const skuMatch = cell.match(/[A-Z0-9]+_[A-Z]+/);
+        let pid = pidMatch ? pidMatch[0] : "";
+        let sku = skuMatch ? skuMatch[0] : "";
 
+        if (!pid || !sku) {
+          for (let back = c - 1; back >= Math.max(0, c - 4); back--) {
+            const backCell = (headerRow[back] || "").trim();
+            if (!pid) { const m = backCell.match(/\d{10,}/); if (m) pid = m[0]; }
+            if (!sku) { const m = backCell.match(/[A-Z0-9]+_[A-Z]+/); if (m) sku = m[0]; }
+          }
+        }
         productCols.push({ name, pid, sku, col: c });
       }
     }
@@ -203,14 +182,24 @@ export async function GET() {
     const sojaeRows = await fetchSheet("GMV | 소재");
     const sojae: { month: string; new: number; rev: number }[] = [];
 
-    // 소재 시트: row[2]=제품명, row[3]=헤더(총소재/신규소재/매출소재/GMV)
-    const sojaeNameRow = sojaeRows[2] || [];
-    const sojaeHeaderRow = sojaeRows[3] || [];
+    // 소재 시트: 헤더 행 찾기 (총 소재 가장 많이 나오는 행)
+    let sojaeHeaderRowIdx = -1;
+    let sojaeMaxCount = 0;
+    for (let i = 0; i < Math.min(10, sojaeRows.length); i++) {
+      const count = sojaeRows[i].filter(c =>
+        c.trim() === "총 소재" || c.trim() === "총소재"
+      ).length;
+      if (count > sojaeMaxCount) { sojaeMaxCount = count; sojaeHeaderRowIdx = i; }
+    }
 
-    // 소재 컬럼 찾기
+    // 제품명은 헤더 바로 위 행
+    const sojaeNameRowIdx = sojaeHeaderRowIdx - 1;
+    const sojaeNameRow = sojaeHeaderRowIdx >= 0 ? (sojaeRows[sojaeNameRowIdx] || []) : [];
+    const sojaeHeaderRow = sojaeHeaderRowIdx >= 0 ? (sojaeRows[sojaeHeaderRowIdx] || []) : [];
+
     const sojaeCols: { name: string; col: number }[] = [];
     let lastSojaeName = "";
-    for (let c = 2; c < sojaeNameRow.length; c++) {
+    for (let c = 2; c < sojaeHeaderRow.length; c++) {
       const n = (sojaeNameRow[c] || "").trim();
       if (n) lastSojaeName = n;
       const h = (sojaeHeaderRow[c] || "").trim();
@@ -219,13 +208,9 @@ export async function GET() {
       }
     }
 
-    // 디버그: 소재 컬럼 이름들
-    const sojaeColNames = sojaeCols.map(s => s.name);
-
-    // 제품별 이번달 소재 집계
     const productSojae: Record<string, { newSojae: number; revSojae: number }> = {};
 
-    for (const row of sojaeRows.slice(4)) {
+    for (const row of sojaeRows.slice(sojaeHeaderRowIdx + 1)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       const mRaw = (row[0] || "").replace(/\s/g, "");
 
@@ -253,7 +238,8 @@ export async function GET() {
       }
     }
 
-    // 제품 요약
+    const sojaeColNames = sojaeCols.map(s => s.name);
+
     const products = productCols.map(({ name, pid, sku }) => {
       const ordByDay = productDailyOrders[name] || {};
       const smpByDay = productDailySamples[name] || {};
@@ -271,13 +257,11 @@ export async function GET() {
         .map(dt => ({ dt, ord: ordByDay[dt]||0, smp: smpByDay[dt]||0, rev: revByDay[dt]||0 }))
         .filter(r => r.ord > 0 || r.smp > 0 || r.rev > 0);
 
-      // 소재 데이터: 제품명 퍼지 매칭
       let sojaeData = productSojae[name];
       if (!sojaeData) {
-        // 유사한 이름 찾기
         const match = sojaeColNames.find(n =>
-          n.includes(name) || name.includes(n) ||
-          n.replace(/\s/g,"") === name.replace(/\s/g,"")
+          n.replace(/\s/g,"") === name.replace(/\s/g,"") ||
+          n.includes(name) || name.includes(n)
         );
         if (match) sojaeData = productSojae[match];
       }
@@ -305,8 +289,8 @@ export async function GET() {
 
     return NextResponse.json({
       daily, productTop10ByPeriod, products, sojae,
+      debugSojaeHeaderRow: sojaeHeaderRowIdx,
       debugSojaeNames: sojaeColNames.slice(0, 5),
-      debugProductNames: productCols.slice(0, 3).map(p => ({ name: p.name, pid: p.pid })),
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
