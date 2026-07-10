@@ -1,72 +1,89 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { Chart, registerables } from "chart.js";
 import { ProductTop10Item } from "@/lib/useSheetData";
-import styles from "./ChartCard.module.css";
-
-Chart.register(...registerables);
+import styles from "./ThisMonthChart.module.css";
 
 interface Props {
   data: ProductTop10Item[];
   periodLabel: string;
+  productDetails?: {
+    name: string;
+    smpThisMonth: number;
+    newSojae: number;
+    revSojae: number;
+  }[];
 }
 
-export default function ThisMonthChart({ data, periodLabel }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<Chart | null>(null);
+export default function ThisMonthChart({ data, periodLabel, productDetails }: Props) {
+  if (!data.length) return (
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "20px", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+      데이터가 없어요
+    </div>
+  );
 
-  useEffect(() => {
-    if (!canvasRef.current || !data.length) return;
-    chartRef.current?.destroy();
-
-    const sorted = [...data].reverse();
-
-    chartRef.current = new Chart(canvasRef.current, {
-      type: "bar",
-      data: {
-        labels: sorted.map(d => d.name),
-        datasets: [{
-          label: "주문수",
-          data: sorted.map(d => d.orders),
-          backgroundColor: "#3b82f6",
-          borderRadius: 4,
-          borderSkipped: "left",
-        }],
-      },
-      options: {
-        indexAxis: "y",
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` 주문수: ${(ctx.raw as number).toLocaleString()}건`,
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: { color: "#94a3b8", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() },
-            grid: { color: "#e2e6ea", lineWidth: 0.5 },
-          },
-          y: {
-            ticks: { color: "#1a202c", font: { size: 11 } },
-            grid: { display: false },
-          },
-        },
-      },
-    });
-    return () => { chartRef.current?.destroy(); };
-  }, [data]);
+  // productDetails에서 추가 정보 매핑
+  const detailMap = new Map(
+    (productDetails || []).map(p => [p.name, p])
+  );
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}>
-        <div className={styles.title}>제품별 주문수 TOP 10 ({periodLabel})</div>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "18px 20px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+          제품별 주문수 TOP 10
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted)" }}>{periodLabel}</div>
       </div>
-      <div style={{ position: "relative", height: 320 }}>
-        <canvas ref={canvasRef} />
+
+      {/* 테이블 */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+              <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500, width: 28 }}>#</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>제품명</th>
+              <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>주문수</th>
+              <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>샘플 출고</th>
+              <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>신규 소재</th>
+              <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>매출 소재</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((p, i) => {
+              const detail = detailMap.get(p.name);
+              return (
+                <tr
+                  key={p.name}
+                  style={{
+                    borderBottom: "1px solid var(--border)",
+                    background: i % 2 === 0 ? "transparent" : "#f8fafc",
+                  }}
+                >
+                  <td style={{ padding: "10px 10px", color: "var(--muted)", fontWeight: 600 }}>
+                    {i + 1}
+                  </td>
+                  <td style={{ padding: "10px 10px", color: "var(--text)", fontWeight: i < 3 ? 600 : 400 }}>
+                    {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
+                    {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
+                    {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
+                    {p.name}
+                  </td>
+                  <td style={{ padding: "10px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>
+                    {p.orders.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--text)" }}>
+                    {detail ? detail.smpThisMonth.toLocaleString() : "-"}
+                  </td>
+                  <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--text)" }}>
+                    {detail ? detail.newSojae.toLocaleString() : "-"}
+                  </td>
+                  <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--text)" }}>
+                    {detail ? detail.revSojae.toLocaleString() : "-"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
