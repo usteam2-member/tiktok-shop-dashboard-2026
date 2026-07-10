@@ -1,12 +1,12 @@
 "use client";
 import { ProductTop10Item } from "@/lib/useSheetData";
-import styles from "./ThisMonthChart.module.css";
 
 interface Props {
   data: ProductTop10Item[];
   periodLabel: string;
   productDetails?: {
     name: string;
+    pid: string;
     smpThisMonth: number;
     newSojae: number;
     revSojae: number;
@@ -20,7 +20,6 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
     </div>
   );
 
-  // productDetails에서 추가 정보 매핑
   const detailMap = new Map(
     (productDetails || []).map(p => [p.name, p])
   );
@@ -28,19 +27,17 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "18px 20px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-          제품별 주문수 TOP 10
-        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>제품별 주문수 TOP 10</div>
         <div style={{ fontSize: 11, color: "var(--muted)" }}>{periodLabel}</div>
       </div>
 
-      {/* 테이블 */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            <tr style={{ borderBottom: "1px solid var(--border)", background: "#f8fafc" }}>
               <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500, width: 28 }}>#</th>
               <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>제품명</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>PID</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>주문수</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>샘플 출고</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>신규 소재</th>
@@ -51,21 +48,16 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
             {data.map((p, i) => {
               const detail = detailMap.get(p.name);
               return (
-                <tr
-                  key={p.name}
-                  style={{
-                    borderBottom: "1px solid var(--border)",
-                    background: i % 2 === 0 ? "transparent" : "#f8fafc",
-                  }}
-                >
-                  <td style={{ padding: "10px 10px", color: "var(--muted)", fontWeight: 600 }}>
-                    {i + 1}
-                  </td>
+                <tr key={p.name} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "#f8fafc" }}>
+                  <td style={{ padding: "10px 10px", color: "var(--muted)", fontWeight: 600 }}>{i + 1}</td>
                   <td style={{ padding: "10px 10px", color: "var(--text)", fontWeight: i < 3 ? 600 : 400 }}>
                     {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
                     {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
                     {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
                     {p.name}
+                  </td>
+                  <td style={{ padding: "10px 10px", color: "#94a3b8", fontSize: 11 }}>
+                    {detail?.pid || "-"}
                   </td>
                   <td style={{ padding: "10px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>
                     {p.orders.toLocaleString()}
