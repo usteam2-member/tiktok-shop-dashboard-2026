@@ -4,7 +4,7 @@ import styles from "./TabBar.module.css";
 
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
-  { icon: "📦", label: "제품별 매출", href: "/dashboard/products" },
+  { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
   { icon: "📅", label: "월간 분석", href: "/dashboard/monthly" },
 ];
 
@@ -23,7 +23,6 @@ export default function TabBar({ activeTab }: Props) {
         if (activeTab) {
           isActive = activeTab === t.label;
         } else {
-          // 정확히 일치하는 경우만 active
           isActive = pathname === t.href;
         }
         return (
