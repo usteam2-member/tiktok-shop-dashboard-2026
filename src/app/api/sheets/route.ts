@@ -47,6 +47,17 @@ function extractName(cell: string): string {
     .trim();
 }
 
+// 소재 시트 셀에서 제품명 추출
+// "1730485848284631676 SB0791_US 세럼 총 소재" → "세럼"
+function extractSojaeName(cell: string): string {
+  return cell
+    .replace(/\d{10,}/g, "")
+    .replace(/[A-Z0-9]+_[A-Z]+/g, "")
+    .replace(/총 소재|총소재|신규 소재|신규소재|매출 소재|매출소재|GMV/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getTopByDays(
   productDailyOrders: Record<string, Record<string, number>>,
   lastDate: Date,
@@ -180,52 +191,53 @@ export async function GET() {
     const sojaeRows = await fetchSheet("GMV | 소재");
     const sojae: { month: string; new: number; rev: number }[] = [];
 
-    // 디버그: 첫 5행 첫 8컬럼
-    const debugSojaeRows = sojaeRows.slice(0, 6).map(r => r.slice(0, 8));
-
-    // 소재 헤더 행 찾기 - "신규 소재" 또는 "신규소재" 가장 많은 행
+    // 소재 시트: row[0]에 "PID SKU 제품명 총 소재" 형태로 합쳐진 헤더
+    // "총 소재" 포함 셀이 가장 많은 행 찾기
     let sojaeHeaderRowIdx = -1;
     let sojaeMaxCount = 0;
     for (let i = 0; i < Math.min(10, sojaeRows.length); i++) {
-      const count = sojaeRows[i].filter(c => {
-        const t = c.trim();
-        return t === "총 소재" || t === "총소재" || t === "신규 소재" || t === "신규소재";
-      }).length;
+      const count = sojaeRows[i].filter(c => c.includes("총 소재") || c.includes("총소재")).length;
       if (count > sojaeMaxCount) { sojaeMaxCount = count; sojaeHeaderRowIdx = i; }
     }
 
-    const sojaeNameRowIdx = sojaeHeaderRowIdx - 1;
-    const sojaeNameRow = sojaeHeaderRowIdx >= 0 ? (sojaeRows[sojaeNameRowIdx] || []) : [];
-    const sojaeHeaderRow = sojaeHeaderRowIdx >= 0 ? (sojaeRows[sojaeHeaderRowIdx] || []) : [];
-
+    // 소재 컬럼 파싱: "PID SKU 제품명 총 소재" → 제품명 추출, col 위치 기록
     const sojaeCols: { name: string; col: number }[] = [];
-    let lastSojaeName = "";
-    for (let c = 2; c < sojaeHeaderRow.length; c++) {
-      const n = (sojaeNameRow[c] || "").trim();
-      if (n) lastSojaeName = n;
-      const h = (sojaeHeaderRow[c] || "").trim();
-      if ((h === "총 소재" || h === "총소재") && lastSojaeName) {
-        sojaeCols.push({ name: lastSojaeName, col: c });
+
+    if (sojaeHeaderRowIdx >= 0) {
+      const headerRow = sojaeRows[sojaeHeaderRowIdx] || [];
+      for (let c = 2; c < headerRow.length; c++) {
+        const cell = (headerRow[c] || "").trim();
+        if (!cell.includes("총 소재") && !cell.includes("총소재")) continue;
+        const name = extractSojaeName(cell);
+        if (name) sojaeCols.push({ name, col: c });
       }
     }
 
     const productSojae: Record<string, { newSojae: number; revSojae: number }> = {};
 
-    for (const row of sojaeRows.slice(sojaeHeaderRowIdx + 1)) {
+    const dataStartRow = sojaeHeaderRowIdx >= 0 ? sojaeHeaderRowIdx + 1 : 1;
+    for (const row of sojaeRows.slice(dataStartRow)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       const mRaw = (row[0] || "").replace(/\s/g, "");
 
       if (/^26\d{2}$/.test(mRaw)) {
+        // 월별 합계 - sojae 배열에 추가
+        // 소재 시트 월별은 col+1=신규, col+2=매출
         let newSum = 0, revSum = 0;
-        for (let c = 3; c < row.length; c += 4) {
-          newSum += safeNum(row[c] || "0");
-          if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
+        for (const { col } of sojaeCols) {
+          newSum += safeNum(row[col + 1] || "0");
+          revSum += safeNum(row[col + 2] || "0");
         }
         if (newSum > 0 || revSum > 0) {
-          sojae.push({ month: MONTH_LABEL[mRaw] || mRaw, new: newSum, rev: revSum });
+          // 중복 방지
+          const existing = sojae.find(s => s.month === (MONTH_LABEL[mRaw] || mRaw));
+          if (!existing) {
+            sojae.push({ month: MONTH_LABEL[mRaw] || mRaw, new: newSum, rev: revSum });
+          }
         }
       }
 
+      // 일별 - 이번달 제품별 소재
       if (isDt(dtRaw) && dtRaw.slice(0, 4) === thisMonth) {
         for (const { name, col } of sojaeCols) {
           const newS = safeNum(row[col + 1] || "0");
@@ -238,6 +250,12 @@ export async function GET() {
         }
       }
     }
+
+    // sojae 월별 정렬
+    sojae.sort((a, b) => {
+      const order = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+      return order.indexOf(a.month) - order.indexOf(b.month);
+    });
 
     const sojaeColNames = sojaeCols.map(s => s.name);
 
@@ -258,12 +276,14 @@ export async function GET() {
         .map(dt => ({ dt, ord: ordByDay[dt]||0, smp: smpByDay[dt]||0, rev: revByDay[dt]||0 }))
         .filter(r => r.ord > 0 || r.smp > 0 || r.rev > 0);
 
+      // 소재 매칭 (공백 무시 비교)
       let sojaeData = productSojae[name];
       if (!sojaeData) {
-        const match = sojaeColNames.find(n =>
-          n.replace(/\s/g,"") === name.replace(/\s/g,"") ||
-          n.includes(name) || name.includes(n)
-        );
+        const nameClean = name.replace(/\s/g, "");
+        const match = sojaeColNames.find(n => {
+          const nClean = n.replace(/\s/g, "");
+          return nClean === nameClean || nClean.includes(nameClean) || nameClean.includes(nClean);
+        });
         if (match) sojaeData = productSojae[match];
       }
 
@@ -291,7 +311,6 @@ export async function GET() {
     return NextResponse.json({
       daily, productTop10ByPeriod, products, sojae,
       debugSojaeHeaderRow: sojaeHeaderRowIdx,
-      debugSojaeRows,
       debugSojaeNames: sojaeColNames.slice(0, 5),
       updatedAt: new Date().toISOString()
     });
