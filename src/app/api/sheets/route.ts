@@ -122,6 +122,7 @@ export async function GET() {
       "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
     };
 
+    // 헤더 행 찾기
     let bestHeaderRow = -1;
     let maxCount = 0;
     for (let i = 0; i < Math.min(15, prodRows.length); i++) {
@@ -129,8 +130,23 @@ export async function GET() {
       if (count > maxCount) { maxCount = count; bestHeaderRow = i; }
     }
 
-    const pidRow = prodRows[0] || [];
-    const skuRow = prodRows[1] || [];
+    // PID: 헤더행에서 긴 숫자가 포함된 셀에서 추출
+    // 각 컬럼의 PID를 미리 매핑
+    const colPidMap: Record<number, string> = {};
+    const colSkuMap: Record<number, string> = {};
+
+    if (bestHeaderRow >= 0) {
+      const headerRow = prodRows[bestHeaderRow] || [];
+      for (let c = 2; c < headerRow.length; c++) {
+        const cell = (headerRow[c] || "").trim();
+        // PID: 10자리 이상 숫자
+        const pidMatch = cell.match(/\d{10,}/);
+        if (pidMatch) colPidMap[c] = pidMatch[0];
+        // SKU: 대문자+숫자+_US 패턴
+        const skuMatch = cell.match(/[A-Z0-9]+_[A-Z]+/);
+        if (skuMatch) colSkuMap[c] = skuMatch[0];
+      }
+    }
 
     const productCols: { name: string; pid: string; sku: string; col: number }[] = [];
 
@@ -141,14 +157,21 @@ export async function GET() {
         if (!cell.includes("매출액(KRW)")) continue;
         const name = extractName(cell);
         if (!name) continue;
-        let pid = "";
-        let sku = "";
-        for (let back = c; back >= Math.max(0, c - 4); back--) {
-          const pidVal = (pidRow[back] || "").trim();
-          const skuVal = (skuRow[back] || "").trim();
-          if (!pid && /^\d{10,}$/.test(pidVal)) pid = pidVal;
-          if (!sku && /[A-Z]+\d+_[A-Z]+/.test(skuVal)) sku = skuVal;
+
+        // 같은 컬럼 or 근처에서 PID/SKU 찾기
+        let pid = colPidMap[c] || "";
+        let sku = colSkuMap[c] || "";
+        if (!pid) {
+          for (let back = c - 1; back >= Math.max(0, c - 3); back--) {
+            if (colPidMap[back]) { pid = colPidMap[back]; break; }
+          }
         }
+        if (!sku) {
+          for (let back = c - 1; back >= Math.max(0, c - 3); back--) {
+            if (colSkuMap[back]) { sku = colSkuMap[back]; break; }
+          }
+        }
+
         productCols.push({ name, pid, sku, col: c });
       }
     }
@@ -180,32 +203,32 @@ export async function GET() {
     const sojaeRows = await fetchSheet("GMV | 소재");
     const sojae: { month: string; new: number; rev: number }[] = [];
 
-    // 소재 시트 구조: row[2]=제품명, row[3]=총소재/신규소재/매출소재/GMV
+    // 소재 시트: row[2]=제품명, row[3]=헤더(총소재/신규소재/매출소재/GMV)
     const sojaeNameRow = sojaeRows[2] || [];
     const sojaeHeaderRow = sojaeRows[3] || [];
 
-    // 제품별 소재 컬럼 찾기
+    // 소재 컬럼 찾기
     const sojaeCols: { name: string; col: number }[] = [];
     let lastSojaeName = "";
-    for (let c = 2; c < sojaeHeaderRow.length; c++) {
+    for (let c = 2; c < sojaeNameRow.length; c++) {
       const n = (sojaeNameRow[c] || "").trim();
-      if (n && n !== "총 소재" && n !== "신규 소재" && n !== "매출 소재" && n !== "GMV") {
-        lastSojaeName = n;
-      }
+      if (n) lastSojaeName = n;
       const h = (sojaeHeaderRow[c] || "").trim();
       if ((h === "총 소재" || h === "총소재") && lastSojaeName) {
         sojaeCols.push({ name: lastSojaeName, col: c });
       }
     }
 
-    // 제품별 이번달 신규/매출 소재 집계
+    // 디버그: 소재 컬럼 이름들
+    const sojaeColNames = sojaeCols.map(s => s.name);
+
+    // 제품별 이번달 소재 집계
     const productSojae: Record<string, { newSojae: number; revSojae: number }> = {};
 
     for (const row of sojaeRows.slice(4)) {
       const dtRaw = (row[1] || "").replace(/\s/g, "");
       const mRaw = (row[0] || "").replace(/\s/g, "");
 
-      // 월별 합계 행 (sojae 집계)
       if (/^26\d{2}$/.test(mRaw)) {
         let newSum = 0, revSum = 0;
         for (let c = 3; c < row.length; c += 4) {
@@ -217,10 +240,8 @@ export async function GET() {
         }
       }
 
-      // 일별 데이터 → 이번달 제품별 소재 집계
       if (isDt(dtRaw) && dtRaw.slice(0, 4) === thisMonth) {
         for (const { name, col } of sojaeCols) {
-          // col: 총소재, col+1: 신규소재, col+2: 매출소재
           const newS = safeNum(row[col + 1] || "0");
           const revS = safeNum(row[col + 2] || "0");
           if (newS > 0 || revS > 0) {
@@ -232,7 +253,7 @@ export async function GET() {
       }
     }
 
-    // 제품별 요약
+    // 제품 요약
     const products = productCols.map(({ name, pid, sku }) => {
       const ordByDay = productDailyOrders[name] || {};
       const smpByDay = productDailySamples[name] || {};
@@ -245,32 +266,31 @@ export async function GET() {
         return diff < days ? a + v : a;
       }, 0);
 
-      const allDts = new Set([
-        ...Object.keys(ordByDay),
-        ...Object.keys(smpByDay),
-        ...Object.keys(revByDay),
-      ]);
-      const dailySeries = Array.from(allDts)
-        .sort()
-        .map(dt => ({
-          dt,
-          ord: ordByDay[dt] || 0,
-          smp: smpByDay[dt] || 0,
-          rev: revByDay[dt] || 0,
-        }))
+      const allDts = new Set([...Object.keys(ordByDay), ...Object.keys(smpByDay), ...Object.keys(revByDay)]);
+      const dailySeries = Array.from(allDts).sort()
+        .map(dt => ({ dt, ord: ordByDay[dt]||0, smp: smpByDay[dt]||0, rev: revByDay[dt]||0 }))
         .filter(r => r.ord > 0 || r.smp > 0 || r.rev > 0);
 
-      const sojaeData = productSojae[name] || { newSojae: 0, revSojae: 0 };
+      // 소재 데이터: 제품명 퍼지 매칭
+      let sojaeData = productSojae[name];
+      if (!sojaeData) {
+        // 유사한 이름 찾기
+        const match = sojaeColNames.find(n =>
+          n.includes(name) || name.includes(n) ||
+          n.replace(/\s/g,"") === name.replace(/\s/g,"")
+        );
+        if (match) sojaeData = productSojae[match];
+      }
 
       return {
         name, pid, sku,
         ordToday: ordByDay[lastDt] || 0,
         ord7: calcOrd(7),
         ord30: calcOrd(30),
-        ordThisMonth: Object.entries(ordByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
-        smpThisMonth: Object.entries(smpByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
-        newSojae: sojaeData.newSojae,
-        revSojae: sojaeData.revSojae,
+        ordThisMonth: Object.entries(ordByDay).reduce((a,[dt,v]) => dt.slice(0,4)===thisMonth?a+v:a, 0),
+        smpThisMonth: Object.entries(smpByDay).reduce((a,[dt,v]) => dt.slice(0,4)===thisMonth?a+v:a, 0),
+        newSojae: sojaeData?.newSojae || 0,
+        revSojae: sojaeData?.revSojae || 0,
         dailySeries,
       };
     });
@@ -285,6 +305,8 @@ export async function GET() {
 
     return NextResponse.json({
       daily, productTop10ByPeriod, products, sojae,
+      debugSojaeNames: sojaeColNames.slice(0, 5),
+      debugProductNames: productCols.slice(0, 3).map(p => ({ name: p.name, pid: p.pid })),
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
