@@ -14,7 +14,8 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 오늘, 7일 → 1일 단위
+  // 날짜 직접 선택 (activeQuick이 null이 아닌데 전체도 아닌 경우 → 커스텀)
+  // 오늘(1), 7일 → 1일 단위
   if (activeQuick === 1 || activeQuick === 7) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -51,6 +52,25 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
 
+  // 날짜 직접 선택한 경우 (14일 이하면 1일, 그 이상이면 자동)
+  if (data.length <= 14) {
+    return {
+      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      rows: data,
+    };
+  }
+  if (data.length <= 60) {
+    // 3일 간격
+    const sampled: DailyRow[] = [];
+    const labels: string[] = [];
+    for (let i = 0; i < data.length; i += 3) {
+      sampled.push(data[i]);
+      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
+    }
+    return { labels, rows: sampled };
+  }
+
+  // 전체 월별
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -66,6 +86,17 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     rows.push(chunk[Math.floor(chunk.length / 2)]);
   }
   return { labels, rows };
+}
+
+function getPeriodLabel(activeQuick: number | null, dataLength: number): string {
+  if (activeQuick === 1) return "오늘 (최근 7일 차트)";
+  if (activeQuick === 7) return "최근 7일 (1일 단위)";
+  if (activeQuick === 30) return "최근 30일 (3일 간격)";
+  if (activeQuick === 90) return "최근 90일 (5일 간격)";
+  // 커스텀 날짜 선택
+  if (dataLength <= 14) return `${dataLength}일 (1일 단위)`;
+  if (dataLength <= 60) return `${dataLength}일 (3일 간격)`;
+  return "전체 (월별)";
 }
 
 function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
@@ -129,11 +160,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 
 export default function DailyCharts({ data, activeQuick }: Props) {
   const { labels, rows } = sampleData(data, activeQuick);
-
-  const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
-    activeQuick === 7 ? "최근 7일 (1일 단위)" :
-    activeQuick === 30 ? "최근 30일 (3일 간격)" :
-    activeQuick === 90 ? "최근 90일 (5일 간격)" : "전체 (월별)";
+  const periodLabel = getPeriodLabel(activeQuick, data.length);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
