@@ -62,7 +62,6 @@ export default function DashboardPage() {
   const handleStart = (v: string) => { setStartDate(v); setActiveQuick(null); pushParams(v, endDate); };
   const handleEnd = (v: string) => { setEndDate(v); setActiveQuick(null); pushParams(startDate, v); };
 
-  // KPI: 오늘이면 마지막 날 하루치만
   const kpiData = useMemo(() => {
     if (!data) return [];
     if (activeQuick === 1) {
@@ -72,7 +71,6 @@ export default function DashboardPage() {
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate, activeQuick]);
 
-  // 차트: 오늘이면 최근 7일치
   const chartData = useMemo(() => {
     if (!data) return [];
     if (activeQuick === 1) {
@@ -85,7 +83,6 @@ export default function DashboardPage() {
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate, activeQuick]);
 
-  // TOP 10 기간별
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
     if (activeQuick === 1) return data.productTop10ByPeriod["1"];
@@ -102,11 +99,11 @@ export default function DashboardPage() {
 
   const chartActiveQuick = activeQuick === 1 ? 7 : activeQuick;
 
-  // 제품 상세 정보 (샘플, 소재)
   const productDetails = useMemo(() => {
     if (!data?.products) return [];
     return data.products.map(p => ({
       name: p.name,
+      pid: p.pid,
       smpThisMonth: p.smpThisMonth,
       newSojae: p.newSojae,
       revSojae: p.revSojae,
