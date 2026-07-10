@@ -176,6 +176,63 @@ export async function GET() {
       }
     }
 
+    // ── GMV | 소재 ───────────────────────────────────────────────
+    const sojaeRows = await fetchSheet("GMV | 소재");
+    const sojae: { month: string; new: number; rev: number }[] = [];
+
+    // 소재 시트 구조: row[2]=제품명, row[3]=총소재/신규소재/매출소재/GMV
+    const sojaeNameRow = sojaeRows[2] || [];
+    const sojaeHeaderRow = sojaeRows[3] || [];
+
+    // 제품별 소재 컬럼 찾기
+    const sojaeCols: { name: string; col: number }[] = [];
+    let lastSojaeName = "";
+    for (let c = 2; c < sojaeHeaderRow.length; c++) {
+      const n = (sojaeNameRow[c] || "").trim();
+      if (n && n !== "총 소재" && n !== "신규 소재" && n !== "매출 소재" && n !== "GMV") {
+        lastSojaeName = n;
+      }
+      const h = (sojaeHeaderRow[c] || "").trim();
+      if ((h === "총 소재" || h === "총소재") && lastSojaeName) {
+        sojaeCols.push({ name: lastSojaeName, col: c });
+      }
+    }
+
+    // 제품별 이번달 신규/매출 소재 집계
+    const productSojae: Record<string, { newSojae: number; revSojae: number }> = {};
+
+    for (const row of sojaeRows.slice(4)) {
+      const dtRaw = (row[1] || "").replace(/\s/g, "");
+      const mRaw = (row[0] || "").replace(/\s/g, "");
+
+      // 월별 합계 행 (sojae 집계)
+      if (/^26\d{2}$/.test(mRaw)) {
+        let newSum = 0, revSum = 0;
+        for (let c = 3; c < row.length; c += 4) {
+          newSum += safeNum(row[c] || "0");
+          if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
+        }
+        if (newSum > 0 || revSum > 0) {
+          sojae.push({ month: MONTH_LABEL[mRaw] || mRaw, new: newSum, rev: revSum });
+        }
+      }
+
+      // 일별 데이터 → 이번달 제품별 소재 집계
+      if (isDt(dtRaw) && dtRaw.slice(0, 4) === thisMonth) {
+        for (const { name, col } of sojaeCols) {
+          // col: 총소재, col+1: 신규소재, col+2: 매출소재
+          const newS = safeNum(row[col + 1] || "0");
+          const revS = safeNum(row[col + 2] || "0");
+          if (newS > 0 || revS > 0) {
+            if (!productSojae[name]) productSojae[name] = { newSojae: 0, revSojae: 0 };
+            productSojae[name].newSojae += newS;
+            productSojae[name].revSojae += revS;
+          }
+        }
+      }
+    }
+
+    // 제품별 요약
     const products = productCols.map(({ name, pid, sku }) => {
       const ordByDay = productDailyOrders[name] || {};
       const smpByDay = productDailySamples[name] || {};
@@ -188,7 +245,6 @@ export async function GET() {
         return diff < days ? a + v : a;
       }, 0);
 
-      // 전체 일별 시계열 (제한 없음)
       const allDts = new Set([
         ...Object.keys(ordByDay),
         ...Object.keys(smpByDay),
@@ -204,6 +260,8 @@ export async function GET() {
         }))
         .filter(r => r.ord > 0 || r.smp > 0 || r.rev > 0);
 
+      const sojaeData = productSojae[name] || { newSojae: 0, revSojae: 0 };
+
       return {
         name, pid, sku,
         ordToday: ordByDay[lastDt] || 0,
@@ -211,8 +269,8 @@ export async function GET() {
         ord30: calcOrd(30),
         ordThisMonth: Object.entries(ordByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
         smpThisMonth: Object.entries(smpByDay).reduce((a, [dt, v]) => dt.slice(0,4) === thisMonth ? a+v : a, 0),
-        newSojae: 0,
-        revSojae: 0,
+        newSojae: sojaeData.newSojae,
+        revSojae: sojaeData.revSojae,
         dailySeries,
       };
     });
@@ -224,23 +282,6 @@ export async function GET() {
       "90": getTopByDays(productDailyOrders, lastDate, 90),
       "all": getTopByDays(productDailyOrders, lastDate, null),
     };
-
-    // ── GMV | 소재 ───────────────────────────────────────────────
-    const sojaeRows = await fetchSheet("GMV | 소재");
-    const sojae: { month: string; new: number; rev: number }[] = [];
-
-    for (const row of sojaeRows.slice(4)) {
-      const mRaw = (row[0] || "").replace(/\s/g, "");
-      if (!/^26\d{2}$/.test(mRaw)) continue;
-      let newSum = 0, revSum = 0;
-      for (let c = 3; c < row.length; c += 4) {
-        newSum += safeNum(row[c] || "0");
-        if (c + 1 < row.length) revSum += safeNum(row[c + 1] || "0");
-      }
-      if (newSum > 0 || revSum > 0) {
-        sojae.push({ month: MONTH_LABEL[mRaw] || mRaw, new: newSum, rev: revSum });
-      }
-    }
 
     return NextResponse.json({
       daily, productTop10ByPeriod, products, sojae,
