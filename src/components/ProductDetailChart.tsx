@@ -87,8 +87,8 @@ function processData(series: ProductDailySeries[], tab: string) {
   return { labels, ordData, smpData, revData };
 }
 
-function OrderRevenueChart({ labels, ordData, revData }: {
-  labels: string[]; ordData: number[]; revData: number[];
+function OrderRevenueChart({ labels, ordData, revData, isMontly }: {
+  labels: string[]; ordData: number[]; revData: number[]; isMontly?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -131,14 +131,22 @@ function OrderRevenueChart({ labels, ordData, revData }: {
           }}},
         },
         scales: {
-          x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
+          x: { 
+            ticks: { 
+              color: "#94a3b8", 
+              font: { size: isMontly ? 8 : 10 }, 
+              maxRotation: isMontly ? 45 : 30,
+              autoSkip: false,
+            }, 
+            grid: { color: "#e2e6ea", lineWidth: 0.5 } 
+          },
           yLeft: { position: "left", ticks: { color: "#3b82f6", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
           yRight: { position: "right", ticks: { color: "#8b5cf6", font: { size: 10 }, callback: (v) => (v as number / 1e6).toFixed(0) + "M" }, grid: { display: false } },
         },
       },
     });
     return () => { chartRef.current?.destroy(); };
-  }, [labels, ordData, revData]);
+  }, [labels, ordData, revData, isMontly]);
 
   return (
     <div className={styles.card}>
@@ -148,7 +156,7 @@ function OrderRevenueChart({ labels, ordData, revData }: {
   );
 }
 
-function SampleChart({ labels, smpData }: { labels: string[]; smpData: number[] }) {
+function SampleChart({ labels, smpData, isMontly }: { labels: string[]; smpData: number[]; isMontly?: boolean; }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -171,13 +179,21 @@ function SampleChart({ labels, smpData }: { labels: string[]; smpData: number[] 
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true }, grid: { display: false } },
+          x: { 
+            ticks: { 
+              color: "#94a3b8", 
+              font: { size: isMontly ? 8 : 10 },
+              maxRotation: isMontly ? 45 : 30,
+              autoSkip: false,
+            }, 
+            grid: { display: false } 
+          },
           y: { ticks: { color: "#10b981", font: { size: 10 }, callback: (v) => (v as number).toLocaleString() }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
         },
       },
     });
     return () => { chartRef.current?.destroy(); };
-  }, [labels, smpData]);
+  }, [labels, smpData, isMontly]);
 
   return (
     <div className={styles.card}>
@@ -190,6 +206,7 @@ function SampleChart({ labels, smpData }: { labels: string[]; smpData: number[] 
 export default function ProductDetailChart({ series }: Props) {
   const [activeTab, setActiveTab] = useState("데일리");
   const { labels, ordData, smpData, revData } = processData(series, activeTab);
+  const isMontly = activeTab === "먼슬리";
 
   const tabLabel = activeTab === "데일리" ? "최근 14일 (1일 단위)" :
     activeTab === "위클리" ? "최근 7일 (1일 단위)" :
@@ -212,8 +229,8 @@ export default function ProductDetailChart({ series }: Props) {
         <span style={{ fontSize: 11, color: "#94a3b8" }}>{tabLabel}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <OrderRevenueChart labels={labels} ordData={ordData} revData={revData} />
-        <SampleChart labels={labels} smpData={smpData} />
+        <OrderRevenueChart labels={labels} ordData={ordData} revData={revData} isMontly={isMontly} />
+        <SampleChart labels={labels} smpData={smpData} isMontly={isMontly} />
       </div>
     </div>
   );
