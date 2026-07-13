@@ -11,7 +11,7 @@ interface Props {
   activeQuick: number | null;
 }
 
-function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[] } {
+function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
   // 날짜 직접 선택 (activeQuick이 null이 아닌데 전체도 아닌 경우 → 커스텀)
@@ -23,15 +23,13 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
 
-  // 30일 → 3일 간격
+  // 30일 → 1일 단위 (전체 표시)
   if (activeQuick === 30) {
-    const sampled: DailyRow[] = [];
-    const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 3) {
-      sampled.push(data[i]);
-      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
-    }
-    return { labels, rows: sampled };
+    return {
+      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      rows: data,
+      is30Day: true,
+    };
   }
 
   // 90일 → 5일 간격
@@ -91,7 +89,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 function getPeriodLabel(activeQuick: number | null, dataLength: number): string {
   if (activeQuick === 1) return "오늘 (최근 7일 차트)";
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
-  if (activeQuick === 30) return "최근 30일 (3일 간격)";
+  if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (5일 간격)";
   // 커스텀 날짜 선택
   if (dataLength <= 14) return `${dataLength}일 (1일 단위)`;
@@ -99,12 +97,13 @@ function getPeriodLabel(activeQuick: number | null, dataLength: number): string 
   return "전체 (월별)";
 }
 
-function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
+function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
   title: string;
   labels: string[];
   datasets: any[];
   yLeftCb: (v: number) => string;
   yRightCb?: (v: number) => string;
+  is30Day?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -127,7 +126,12 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
         },
         scales: {
           x: {
-            ticks: { color: "#94a3b8", font: { size: 10 }, maxRotation: 30, autoSkip: true },
+            ticks: { 
+              color: "#94a3b8", 
+              font: { size: is30Day ? 8 : 10 }, 
+              maxRotation: is30Day ? 45 : 30,
+              autoSkip: false,
+            },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
           yLeft: {
@@ -146,7 +150,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
       },
     });
     return () => { chartRef.current?.destroy(); };
-  }, [labels, datasets]);
+  }, [labels, datasets, is30Day]);
 
   return (
     <div className={styles.card}>
@@ -159,7 +163,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 }
 
 export default function DailyCharts({ data, activeQuick }: Props) {
-  const { labels, rows } = sampleData(data, activeQuick);
+  const { labels, rows, is30Day } = sampleData(data, activeQuick);
   const periodLabel = getPeriodLabel(activeQuick, data.length);
 
   return (
@@ -169,6 +173,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         labels={labels}
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toLocaleString()}
+        is30Day={is30Day}
         datasets={[
           { label: "매출(KRW)", data: rows.map(r => r.krw), borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "주문수", data: rows.map(r => r.ord), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -179,6 +184,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         labels={labels}
         yLeftCb={(v) => v.toLocaleString()}
         yRightCb={(v) => v.toLocaleString()}
+        is30Day={is30Day}
         datasets={[
           { label: "소재 업로드", data: rows.map(r => r.aff), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "샘플 출고", data: rows.map(r => r.smp), borderColor: "#ef4444", borderDash: [5, 4], backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -189,6 +195,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         labels={labels}
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toFixed(0) + "%"}
+        is30Day={is30Day}
         datasets={[
           { label: "광고비(KRW)", data: rows.map(r => r.adCost), borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "ROAS", data: rows.map(r => r.roas), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -198,6 +205,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
         title={`객단가 USD (${periodLabel})`}
         labels={labels}
         yLeftCb={(v) => "$" + v.toFixed(1)}
+        is30Day={is30Day}
         datasets={[
           { label: "객단가(USD)", data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
         ]}
