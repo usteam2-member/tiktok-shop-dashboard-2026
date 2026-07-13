@@ -14,27 +14,6 @@ export interface ProductDailySeries {
   rev: number;
 }
 
-export interface KpiMetric {
-  target: number;
-  current: number;
-  rate: number;
-  diff: number;
-}
-
-export interface KpiVideoMetric {
-  target: number;
-  current: number;
-  rate: number;
-  completed: string;
-}
-
-export interface KpiData {
-  product: string;
-  invite: KpiMetric;
-  shipment: KpiMetric;
-  video: KpiVideoMetric;
-}
-
 export interface ProductItem {
   name: string;
   pid: string;
@@ -47,8 +26,6 @@ export interface ProductItem {
   newSojae: number;
   revSojae: number;
   dailySeries: ProductDailySeries[];
-  // 새 KPI 데이터
-  kpi?: KpiData;
 }
 
 export interface SheetData {
@@ -62,7 +39,6 @@ export interface SheetData {
   };
   products: ProductItem[];
   sojae: SojaeRow[];
-  kpi: Record<string, KpiData>;
   updatedAt: string;
 }
 
@@ -73,28 +49,13 @@ export function useSheetData() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetch("/api/sheets").then(r => {
+    fetch("/api/sheets")
+      .then((r) => {
         if (!r.ok) throw new Error("데이터 로드 실패");
         return r.json();
-      }),
-      fetch("/api/kpi").then(r => {
-        if (!r.ok) throw new Error("KPI 데이터 로드 실패");
-        return r.json();
-      }),
-    ])
-      .then(([sheetData, kpiData]) => {
-        // KPI 데이터를 products에 매핑
-        const productsWithKpi = sheetData.products.map((p: ProductItem) => ({
-          ...p,
-          kpi: kpiData.kpi[p.pid],
-        }));
-
-        setData({
-          ...sheetData,
-          products: productsWithKpi,
-          kpi: kpiData.kpi,
-        });
+      })
+      .then((d) => {
+        setData(d);
         setLoading(false);
       })
       .catch((e) => {
