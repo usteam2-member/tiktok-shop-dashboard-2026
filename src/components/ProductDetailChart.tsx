@@ -56,19 +56,15 @@ function processData(series: ProductDailySeries[], tab: string) {
     };
   }
 
-  // 먼슬리: 전체 데이터 5일 단위 샘플링
+  // 먼슬리: 최근 30일 1일 단위
   if (tab === "먼슬리") {
-    const labels: string[] = [];
-    const ordData: number[] = [];
-    const smpData: number[] = [];
-    const revData: number[] = [];
-    for (let i = 0; i < all.length; i += 5) {
-      labels.push(all[i].dt.slice(2,4) + "/" + all[i].dt.slice(4,6));
-      ordData.push(all[i].ord);
-      smpData.push(all[i].smp);
-      revData.push(all[i].rev);
-    }
-    return { labels, ordData, smpData, revData };
+    const filtered = all.filter(r => diffDays(r.dt) < 30);
+    return {
+      labels: filtered.map(r => r.dt.slice(2,4) + "/" + r.dt.slice(4,6)),
+      ordData: filtered.map(r => r.ord),
+      smpData: filtered.map(r => r.smp),
+      revData: filtered.map(r => r.rev),
+    };
   }
 
   // 전체 - 월별 합산
@@ -197,7 +193,7 @@ export default function ProductDetailChart({ series }: Props) {
 
   const tabLabel = activeTab === "데일리" ? "최근 14일 (1일 단위)" :
     activeTab === "위클리" ? "최근 7일 (1일 단위)" :
-    activeTab === "먼슬리" ? "전체 (5일 간격)" : "전체 (월별)";
+    activeTab === "먼슬리" ? "최근 30일 (1일 단위)" : "전체 (월별)";
 
   return (
     <div style={{ marginTop: 24 }}>
