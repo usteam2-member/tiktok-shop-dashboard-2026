@@ -20,10 +20,17 @@ export default function ProductSearch({ products }: Props) {
   const [kpiMap, setKpiMap] = useState<Record<string, KpiData>>({});
 
   useEffect(() => {
+    // KPI 로드 시도, 실패해도 무시
     fetch("/api/kpi")
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) return { kpi: {} };
+        return r.json();
+      })
       .then(d => setKpiMap(d.kpi || {}))
-      .catch(() => setKpiMap({}));
+      .catch(() => {
+        console.log("KPI 데이터를 로드할 수 없습니다. 계속 진행합니다.");
+        setKpiMap({});
+      });
   }, []);
 
   const filtered = query.trim()
