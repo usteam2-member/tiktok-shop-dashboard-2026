@@ -1,8 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ProductItem } from "@/lib/useSheetData";
 import ProductDetailChart from "@/components/ProductDetailChart";
+import KpiProgressChart from "@/components/KpiProgressChart";
 import styles from "./ProductSearch.module.css";
+
+interface KpiMetric {
+  target: number;
+  current: number;
+  rate: number;
+}
+
+interface KpiData {
+  product: string;
+  invite: KpiMetric;
+  shipment: KpiMetric;
+  video: KpiMetric;
+}
 
 interface Props {
   products: ProductItem[];
@@ -11,6 +25,23 @@ interface Props {
 export default function ProductSearch({ products }: Props) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<ProductItem | null>(null);
+  const [kpiMap, setKpiMap] = useState<Record<string, KpiData>>({});
+  const [loadingKpi, setLoadingKpi] = useState(false);
+
+  // KPI 데이터 로드
+  useEffect(() => {
+    setLoadingKpi(true);
+    fetch("/api/kpi")
+      .then(r => r.ok ? r.json() : { kpi: {} })
+      .then(d => {
+        setKpiMap(d.kpi || {});
+        setLoadingKpi(false);
+      })
+      .catch(() => {
+        setKpiMap({});
+        setLoadingKpi(false);
+      });
+  }, []);
 
   const filtered = query.trim()
     ? products.filter(p =>
@@ -19,6 +50,8 @@ export default function ProductSearch({ products }: Props) {
         p.sku.toLowerCase().includes(query.toLowerCase())
       )
     : [];
+
+  const selectedKpi = selected ? kpiMap[selected.pid] : null;
 
   return (
     <div className={styles.wrap}>
@@ -114,6 +147,15 @@ export default function ProductSearch({ products }: Props) {
               <div className={styles.kpiVal}>{selected.revSojae.toLocaleString()}</div>
             </div>
           </div>
+
+          {/* KPI 목표 vs 달성 */}
+          {selectedKpi && !loadingKpi && (
+            <KpiProgressChart 
+              invite={selectedKpi.invite}
+              shipment={selectedKpi.shipment}
+              video={selectedKpi.video}
+            />
+          )}
 
           {/* 추이 차트 */}
           <ProductDetailChart series={selected.dailySeries} />
