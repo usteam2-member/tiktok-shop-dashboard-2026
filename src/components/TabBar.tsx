@@ -5,7 +5,7 @@ import styles from "./TabBar.module.css";
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
   { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
-  { icon: "📅", label: "월간 분석", href: "/dashboard/monthly" },
+{ icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
 ];
 
 interface Props {
