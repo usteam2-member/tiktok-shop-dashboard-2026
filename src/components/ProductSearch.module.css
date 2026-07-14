@@ -1,102 +1,256 @@
-/* KPI 비교 섹션 */
-.kpiCompareSection {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 2px solid #f0f0f0;
+.wrap {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.kpiCompareTitle {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 1.2rem;
+.searchBox {
+  position: relative;
+  margin-bottom: 2rem;
 }
 
-.kpiTable {
+.searchIcon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
-  overflow: hidden;
+  font-size: 0.95rem;
   background: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.kpiTableHead {
+.input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.clear {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+}
+
+.clear:hover {
+  color: #666;
+}
+
+/* 검색 결과 목록 */
+.resultList {
+  margin-bottom: 2rem;
+}
+
+.resultHeader {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.5fr;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f5f5f5;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid #e0e0e0;
   font-weight: 600;
   font-size: 0.9rem;
-  border-bottom: 2px solid #e0e0e0;
+  color: #333;
 }
 
-.kpiTableRow {
+.headerCols {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.5fr;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  text-align: right;
+}
+
+.resultRow {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
   border-bottom: 1px solid #f0f0f0;
   align-items: center;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
-.kpiTableRow:last-child {
-  border-bottom: none;
-}
-
-.kpiTableRow:nth-child(even) {
+.resultRow:hover {
   background: #f9f9f9;
 }
 
-.kpiTableCol {
-  padding: 1rem;
-  font-size: 0.95rem;
-  color: #333;
-  font-weight: 500;
+.resultLeft {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
-.kpiTableHead .kpiTableCol {
-  padding: 0.75rem 1rem;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.progressBarSmall {
-  width: 100%;
-  height: 16px;
-  background: #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 0.3rem;
-}
-
-.progressFill {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
-.rateText {
-  font-size: 0.85rem;
+.resultName {
   font-weight: 600;
   color: #333;
-  display: block;
+  font-size: 0.95rem;
+}
+
+.resultPid {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.resultCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+}
+
+.colItem {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.colVal {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+/* 검색 결과 없음 */
+.noResult {
+  padding: 2rem;
   text-align: center;
+  color: #999;
+  font-size: 0.95rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+/* 초기 화면 */
+.empty {
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.emptyText {
+  font-size: 1.1rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.emptyCount {
+  font-size: 0.9rem;
+  color: #999;
+}
+
+/* 상세 화면 */
+.detail {
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.back {
+  background: none;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  padding: 0;
+}
+
+.back:hover {
+  text-decoration: underline;
+}
+
+.detailHeader {
+  margin-bottom: 1.5rem;
+}
+
+.detailName {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 0.5rem 0;
+}
+
+.detailMeta {
+  font-size: 0.85rem;
+  color: #999;
+  margin: 0.25rem 0;
+}
+
+/* KPI 카드 그리드 */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.kpiCard {
+  background: white;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.kpiLabel {
+  font-size: 0.8rem;
+  color: #999;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.kpiVal {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #333;
 }
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .kpiTableHead,
-  .kpiTableRow {
-    grid-template-columns: 1fr 0.8fr 0.8fr 1.2fr;
+  .wrap {
+    padding: 1rem;
   }
 
-  .kpiTableCol {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.85rem;
+  .resultHeader,
+  .resultRow {
+    grid-template-columns: 1fr;
   }
 
-  .kpiTableHead .kpiTableCol {
-    padding: 0.6rem 0.5rem;
-    font-size: 0.75rem;
+  .headerCols,
+  .resultCols {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .colItem {
+    justify-content: flex-start;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .detailName {
+    font-size: 1.25rem;
   }
 }
