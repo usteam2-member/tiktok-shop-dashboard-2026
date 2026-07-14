@@ -1,175 +1,102 @@
-"use client";
-import { useState, useEffect } from "react";
-import { ProductItem } from "@/lib/useSheetData";
-import ProductDetailChart from "@/components/ProductDetailChart";
-import KpiProgressChart from "@/components/KpiProgressChart";
-import styles from "./ProductSearch.module.css";
-
-interface KpiMetric {
-  target: number;
-  current: number;
-  rate: number;
+/* KPI 비교 섹션 */
+.kpiCompareSection {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #f0f0f0;
 }
 
-interface KpiData {
-  product: string;
-  invite: KpiMetric;
-  shipment: KpiMetric;
-  video: KpiMetric;
+.kpiCompareTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1.2rem;
 }
 
-interface Props {
-  products: ProductItem[];
+.kpiTable {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-export default function ProductSearch({ products }: Props) {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<ProductItem | null>(null);
-  const [kpiMap, setKpiMap] = useState<Record<string, KpiData>>({});
-  const [loadingKpi, setLoadingKpi] = useState(false);
+.kpiTableHead {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.5fr;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-bottom: 2px solid #e0e0e0;
+}
 
-  // KPI 데이터 로드
-  useEffect(() => {
-    setLoadingKpi(true);
-    fetch("/api/kpi")
-      .then(r => r.ok ? r.json() : { kpi: {} })
-      .then(d => {
-        setKpiMap(d.kpi || {});
-        setLoadingKpi(false);
-      })
-      .catch(() => {
-        setKpiMap({});
-        setLoadingKpi(false);
-      });
-  }, []);
+.kpiTableRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.5fr;
+  border-bottom: 1px solid #f0f0f0;
+  align-items: center;
+}
 
-  const filtered = query.trim()
-    ? products.filter(p =>
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        p.pid.includes(query) ||
-        p.sku.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+.kpiTableRow:last-child {
+  border-bottom: none;
+}
 
-  const selectedKpi = selected ? kpiMap[selected.pid] : null;
+.kpiTableRow:nth-child(even) {
+  background: #f9f9f9;
+}
 
-  return (
-    <div className={styles.wrap}>
-      {/* 검색창 */}
-      <div className={styles.searchBox}>
-        <span className={styles.searchIcon}>🔍</span>
-        <input
-          className={styles.input}
-          placeholder="제품명, PID, SKU로 검색..."
-          value={query}
-          onChange={e => { setQuery(e.target.value); setSelected(null); }}
-        />
-        {query && (
-          <button className={styles.clear} onClick={() => { setQuery(""); setSelected(null); }}>✕</button>
-        )}
-      </div>
+.kpiTableCol {
+  padding: 1rem;
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 
-      {/* 검색 결과 목록 */}
-      {!selected && filtered.length > 0 && (
-        <div className={styles.resultList}>
-          <div className={styles.resultHeader}>
-            <span>제품</span>
-            <div className={styles.headerCols}>
-              <span>이번달 주문</span>
-              <span>이번달 샘플</span>
-              <span>신규 소재</span>
-            </div>
-          </div>
-          {filtered.map(p => (
-            <div key={p.name} className={styles.resultRow} onClick={() => setSelected(p)}>
-              <div className={styles.resultLeft}>
-                <div className={styles.resultName}>{p.name}</div>
-                {p.pid && <div className={styles.resultPid}>PID: {p.pid}</div>}
-              </div>
-              <div className={styles.resultCols}>
-                <div className={styles.colItem}>
-                  <span className={styles.colVal}>{p.ordThisMonth.toLocaleString()}</span>
-                </div>
-                <div className={styles.colItem}>
-                  <span className={styles.colVal}>{p.smpThisMonth.toLocaleString()}</span>
-                </div>
-                <div className={styles.colItem}>
-                  <span className={styles.colVal}>{p.newSojae.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+.kpiTableHead .kpiTableCol {
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 
-      {!selected && query && filtered.length === 0 && (
-        <div className={styles.noResult}>검색 결과가 없어요 😅</div>
-      )}
+.progressBarSmall {
+  width: 100%;
+  height: 16px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
 
-      {/* 상세 보기 */}
-      {selected && (
-        <div className={styles.detail}>
-          <button className={styles.back} onClick={() => setSelected(null)}>← 목록으로</button>
-          <div className={styles.detailHeader}>
-            <h2 className={styles.detailName}>{selected.name}</h2>
-            {selected.pid && <div className={styles.detailMeta}>PID: {selected.pid}</div>}
-            {selected.sku && <div className={styles.detailMeta}>SKU: {selected.sku}</div>}
-          </div>
+.progressFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
 
-          {/* KPI 카드 */}
-          <div className={styles.kpiGrid}>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>오늘 주문수</div>
-              <div className={styles.kpiVal}>{selected.ordToday.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>최근 7일 주문수</div>
-              <div className={styles.kpiVal}>{selected.ord7.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>최근 30일 주문수</div>
-              <div className={styles.kpiVal}>{selected.ord30.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>이번달 주문수</div>
-              <div className={styles.kpiVal}>{selected.ordThisMonth.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>이번달 샘플 출고</div>
-              <div className={styles.kpiVal}>{selected.smpThisMonth.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>이번달 신규 소재</div>
-              <div className={styles.kpiVal}>{selected.newSojae.toLocaleString()}</div>
-            </div>
-            <div className={styles.kpiCard}>
-              <div className={styles.kpiLabel}>이번달 매출 소재</div>
-              <div className={styles.kpiVal}>{selected.revSojae.toLocaleString()}</div>
-            </div>
-          </div>
+.rateText {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #333;
+  display: block;
+  text-align: center;
+}
 
-          {/* KPI 목표 vs 달성 */}
-          {selectedKpi && !loadingKpi && (
-            <KpiProgressChart 
-              invite={selectedKpi.invite}
-              shipment={selectedKpi.shipment}
-              video={selectedKpi.video}
-            />
-          )}
+/* 반응형 */
+@media (max-width: 768px) {
+  .kpiTableHead,
+  .kpiTableRow {
+    grid-template-columns: 1fr 0.8fr 0.8fr 1.2fr;
+  }
 
-          {/* 추이 차트 */}
-          <ProductDetailChart series={selected.dailySeries} />
-        </div>
-      )}
+  .kpiTableCol {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.85rem;
+  }
 
-      {/* 초기 화면 */}
-      {!query && !selected && (
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>🔍</div>
-          <div className={styles.emptyText}>제품명, PID, SKU를 입력해서 검색해보세요</div>
-          <div className={styles.emptyCount}>총 {products.length}개 제품</div>
-        </div>
-      )}
-    </div>
-  );
+  .kpiTableHead .kpiTableCol {
+    padding: 0.6rem 0.5rem;
+    font-size: 0.75rem;
+  }
 }
