@@ -34,29 +34,16 @@ function safeNum(v: string): number {
 
 async function fetchKpiSheet() {
   const res = await fetch(sheetUrl(), { cache: "no-store" });
-  if (!res.ok) throw new Error(`KPI 시트 로드 실패`);
+  if (!res.ok) throw new Error("KPI 시트 로드 실패");
   return parseCSV(await res.text());
 }
 
 export async function GET() {
   try {
     const rows = await fetchKpiSheet();
+    if (rows.length < 4) return NextResponse.json({ kpi: {} });
 
-    if (rows.length < 4) {
-      return NextResponse.json({ kpi: {}, error: "데이터 없음" });
-    }
-
-    const kpiData: Record<
-      string,
-      {
-        product: string;
-        invite: { target: number; current: number; rate: number };
-        shipment: { target: number; current: number; rate: number };
-        video: { target: number; current: number; rate: number };
-      }
-    > = {};
-
-    // 행 4부터 데이터 (인덱스 3)
+    const kpiData: Record<string, any> = {};
     const dataStartIdx = 3;
 
     for (let i = dataStartIdx; i < rows.length; i++) {
@@ -68,17 +55,14 @@ export async function GET() {
 
       if (!pid || !product) continue;
 
-      // 초대: F(5), G(6), H(7)
       const inviteTarget = safeNum(row[5] || "0");
       const inviteCurrent = safeNum(row[6] || "0");
       const inviteRate = inviteTarget > 0 ? (inviteCurrent / inviteTarget) * 100 : 0;
 
-      // 출고: J(9), K(10), L(11)
       const shipmentTarget = safeNum(row[9] || "0");
       const shipmentCurrent = safeNum(row[10] || "0");
       const shipmentRate = shipmentTarget > 0 ? (shipmentCurrent / shipmentTarget) * 100 : 0;
 
-      // 영상: N(13), O(14), P(15)
       const videoTarget = safeNum(row[13] || "0");
       const videoCurrent = safeNum(row[14] || "0");
       const videoRate = videoTarget > 0 ? (videoCurrent / videoTarget) * 100 : 0;
@@ -91,9 +75,8 @@ export async function GET() {
       };
     }
 
-    return NextResponse.json({ kpi: kpiData, updatedAt: new Date().toISOString() });
+    return NextResponse.json({ kpi: kpiData });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ kpi: {}, error: String(err) }, { status: 500 });
+    return NextResponse.json({ kpi: {} });
   }
 }
