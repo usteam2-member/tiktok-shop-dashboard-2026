@@ -1,0 +1,189 @@
+.container {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+/* 검색창 */
+.searchBox {
+  position: relative;
+  margin-bottom: 2rem;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+}
+
+.searchInput {
+  width: 100%;
+  max-width: 500px;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.clearBtn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #999;
+}
+
+.clearBtn:hover {
+  color: #666;
+}
+
+/* 섹션 */
+.section {
+  margin-bottom: 3rem;
+}
+
+.sectionTitle {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.productGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.noResult {
+  padding: 2rem;
+  text-align: center;
+  color: #999;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+/* KPI 카드 */
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+}
+
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.productName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.25rem;
+}
+
+.productPid {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.avgRate {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* KPI 행 */
+.kpiRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.kpiLabel {
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 500;
+  min-width: 40px;
+}
+
+.kpiBar {
+  flex: 1;
+  height: 20px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kpiBarFill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.kpiPercent {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .sectionTitle {
+    font-size: 1.1rem;
+  }
+
+  .productGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .searchInput {
+    max-width: 100%;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+}
