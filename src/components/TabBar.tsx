@@ -5,7 +5,7 @@ import styles from "./TabBar.module.css";
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
   { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
-{ icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
+  { icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
 ];
 
 interface Props {
@@ -23,7 +23,12 @@ export default function TabBar({ activeTab }: Props) {
         if (activeTab) {
           isActive = activeTab === t.label;
         } else {
-          isActive = pathname === t.href;
+          // 대시보드는 정확히 매칭, 다른 탭은 부분 매칭
+          if (t.href === "/dashboard") {
+            isActive = pathname === "/dashboard";
+          } else {
+            isActive = pathname.startsWith(t.href);
+          }
         }
         return (
           <div
