@@ -14,8 +14,6 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 날짜 직접 선택 (activeQuick이 null이 아닌데 전체도 아닌 경우 → 커스텀)
-  // 오늘(1), 7일 → 1일 단위
   if (activeQuick === 1 || activeQuick === 7) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -23,7 +21,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
 
-  // 30일 → 1일 단위 (전체 표시)
   if (activeQuick === 30) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -32,7 +29,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
 
-  // 90일 → 5일 간격
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
@@ -43,14 +39,12 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 전체(null) → 월별 중간값
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
     "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
 
-  // 날짜 직접 선택한 경우 (14일 이하면 1일, 그 이상이면 자동)
   if (data.length <= 14) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
@@ -58,7 +52,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
   }
   if (data.length <= 60) {
-    // 3일 간격
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
     for (let i = 0; i < data.length; i += 3) {
@@ -68,7 +61,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 전체 월별
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -91,7 +83,6 @@ function getPeriodLabel(activeQuick: number | null, dataLength: number): string 
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (5일 간격)";
-  // 커스텀 날짜 선택
   if (dataLength <= 14) return `${dataLength}일 (1일 단위)`;
   if (dataLength <= 60) return `${dataLength}일 (3일 간격)`;
   return "전체 (월별)";
@@ -136,12 +127,14 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
           },
           yLeft: {
             position: "left",
+            beginAtZero: true,
             ticks: { color: "#64748b", font: { size: 10 }, callback: (v) => yLeftCb(v as number) },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
           ...(yRightCb ? {
             yRight: {
               position: "right",
+              beginAtZero: true,
               ticks: { color: "#94a3b8", font: { size: 10 }, callback: (v) => yRightCb(v as number) },
               grid: { display: false },
             }
