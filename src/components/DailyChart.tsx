@@ -45,25 +45,29 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
 
-  if (data.length <= 14) {
+  // 전체: 2026년만 필터링 후 월별 집계
+  const filtered2026 = data.filter(r => r.dt.startsWith("2026"));
+  
+  if (filtered2026.length <= 14) {
     return {
-      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-      rows: data,
+      labels: filtered2026.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      rows: filtered2026,
     };
   }
-  if (data.length <= 60) {
+  
+  if (filtered2026.length <= 60) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 3) {
-      sampled.push(data[i]);
-      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
+    for (let i = 0; i < filtered2026.length; i += 3) {
+      sampled.push(filtered2026[i]);
+      labels.push(filtered2026[i].dt.slice(2, 4) + "/" + filtered2026[i].dt.slice(4, 6));
     }
     return { labels, rows: sampled };
   }
 
   // 월별 데이터 합계
   const monthMap: Record<string, DailyRow[]> = {};
-  for (const r of data) {
+  for (const r of filtered2026) {
     const m = r.dt.slice(0, 4);
     if (!monthMap[m]) monthMap[m] = [];
     monthMap[m].push(r);
@@ -98,7 +102,7 @@ function getPeriodLabel(activeQuick: number | null, dataLength: number): string 
   if (activeQuick === 90) return "최근 90일 (5일 간격)";
   if (dataLength <= 14) return `${dataLength}일 (1일 단위)`;
   if (dataLength <= 60) return `${dataLength}일 (3일 간격)`;
-  return "전체 (월별)";
+  return "2026년 (월별)";
 }
 
 function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
@@ -170,7 +174,15 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
 
 export default function DailyCharts({ data, activeQuick }: Props) {
   const { labels, rows, is30Day } = sampleData(data, activeQuick);
-  const periodLabel = getPeriodLabel(activeQuick, data.length);
+  const periodLabel = getPeriodLabel(activeQuick, rows.length);
+
+  if (!labels.length || !rows.length) {
+    return (
+      <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>
+        데이터가 없어요
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
