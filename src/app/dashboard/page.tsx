@@ -9,7 +9,6 @@ import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
 import ThisMonthChart from "@/components/ThisMonthChart";
-import styles from "./page.module.css";
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -44,14 +43,20 @@ export default function DashboardPage() {
     setActiveQuick(days);
     
     const allDates = data.daily;
-    const endD = dtToDate(allDates[allDates.length - 1].dt);
     let startD: Date;
+    let endD: Date;
 
     if (days === null) {
-      startD = dtToDate(allDates[0].dt);
+      // 전체: 2026년만 (2026-01-01 ~ 2026-07-31)
+      startD = new Date("2026-01-01");
+      endD = new Date("2026-07-31");
     } else if (days === 1) {
+      // 오늘: 마지막 날짜
+      endD = dtToDate(allDates[allDates.length - 1].dt);
       startD = endD;
     } else {
+      // 최근 N일
+      endD = dtToDate(allDates[allDates.length - 1].dt);
       startD = new Date(endD);
       startD.setDate(endD.getDate() - days + 1);
     }
@@ -88,7 +93,7 @@ export default function DashboardPage() {
   const periodLabel = activeQuick === 1 ? "오늘" :
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
-    activeQuick === 90 ? "최근 90일" : "전체";
+    activeQuick === 90 ? "최근 90일" : "2026년 전체";
 
   const productDetails = useMemo(() => {
     if (!data?.products) return [];
@@ -102,7 +107,7 @@ export default function DashboardPage() {
   }, [data]);
 
   return (
-    <div className={styles.wrap}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Navbar startDate={startDate} endDate={endDate} />
       <TabBar />
       <FilterBar
@@ -113,26 +118,26 @@ export default function DashboardPage() {
         onEndChange={handleEnd}
         onQuick={handleQuick}
       />
-      <main className={styles.main}>
+      <main style={{ flex: 1, padding: "20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
         {loading && (
-          <div className={styles.loadingWrap}>
-            <div className={styles.spinner} />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "300px", gap: "20px" }}>
+            <div style={{ width: "40px", height: "40px", border: "3px solid #e5e7eb", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
             <p>구글 시트에서 데이터 불러오는 중...</p>
           </div>
         )}
         {error && (
-          <div className={styles.errorWrap}>
+          <div style={{ padding: "20px", background: "#fee2e2", color: "#991b1b", borderRadius: "8px", margin: "20px" }}>
             <p>⚠️ 데이터 로드 실패: {error}</p>
           </div>
         )}
         {data && !loading && (
           <>
-            <div className={styles.updateInfo}>
+            <div style={{ padding: "12px 16px", background: "#f0f9ff", borderLeft: "3px solid #3b82f6", fontSize: "12px", color: "#1e40af", marginBottom: "20px" }}>
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
             <KpiRow data={kpiData} />
             <DailyCharts data={chartData} activeQuick={activeQuick} />
-            <div className={styles.fullWidth}>
+            <div style={{ gridColumn: "1 / -1" }}>
               <ThisMonthChart
                 data={top10Data}
                 periodLabel={periodLabel}
