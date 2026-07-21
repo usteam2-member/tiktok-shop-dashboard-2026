@@ -2,72 +2,11 @@
 import { useEffect, useRef } from "react";
 import { Chart, registerables } from "chart.js";
 import { ProductDailySeries } from "@/lib/data";
-import styles from "./ChartCard.module.css";
 
 Chart.register(...registerables);
 
-interface ProcessedData {
-  labels: string[];
-  ordData: number[];
-  smpData: number[];
-}
-
 interface Props {
   series: ProductDailySeries[];
-}
-
-function processData(series: ProductDailySeries[], tab: string): ProcessedData {
-  const all = [...series].sort((a, b) => a.dt.localeCompare(b.dt));
-  if (!all.length) return { labels: [], ordData: [], smpData: [] };
-
-  if (tab === "대일권") {
-    const last = all[all.length - 1];
-    const lastDate = new Date(
-      2000 + parseInt(last.dt.slice(0, 2)),
-      parseInt(last.dt.slice(2, 4)) - 1,
-      parseInt(last.dt.slice(4, 6))
-    );
-
-    const diffDays = (dt: string) => {
-      const y = 2000 + parseInt(dt.slice(0, 2)),
-        m = parseInt(dt.slice(2, 4)) - 1,
-        d = parseInt(dt.slice(4, 6));
-      return Math.round((lastDate.getTime() - new Date(y, m, d).getTime()) / 86400000);
-    };
-
-    if (tab === "대일권") {
-      const filtered = all.filter(r => diffDays(r.dt) < 14);
-      return {
-        labels: filtered.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-        ordData: filtered.map(r => r.ord),
-        smpData: filtered.map(r => r.smp),
-      };
-    }
-
-    if (tab === "위클리") {
-      const filtered = all.filter(r => diffDays(r.dt) < 7);
-      return {
-        labels: filtered.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-        ordData: filtered.map(r => r.ord),
-        smpData: filtered.map(r => r.smp),
-      };
-    }
-
-    if (tab === "먼슬리") {
-      const filtered = all.filter(r => diffDays(r.dt) < 30);
-      return {
-        labels: filtered.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-        ordData: filtered.map(r => r.ord),
-        smpData: filtered.map(r => r.smp),
-      };
-    }
-  }
-
-  return {
-    labels: all.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-    ordData: all.map(r => r.ord),
-    smpData: all.map(r => r.smp),
-  };
 }
 
 export default function ProductDetailChart({ series }: Props) {
@@ -78,8 +17,26 @@ export default function ProductDetailChart({ series }: Props) {
   const updateChart = () => {
     if (!canvasRef.current || !series.length) return;
 
-    const { labels, ordData, smpData } = processData(series, tabRef.current);
-    if (!labels.length) return;
+    const all = [...series].sort((a, b) => a.dt.localeCompare(b.dt));
+    if (!all.length) return;
+
+    let labels: string[] = [];
+    let ordData: number[] = [];
+    let smpData: number[] = [];
+
+    if (tabRef.current === "대일권") {
+      labels = all.slice(-14).map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.slice(-14).map(r => r.ord);
+      smpData = all.slice(-14).map(r => r.smp);
+    } else if (tabRef.current === "위클리") {
+      labels = all.slice(-7).map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.slice(-7).map(r => r.ord);
+      smpData = all.slice(-7).map(r => r.smp);
+    } else {
+      labels = all.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.map(r => r.ord);
+      smpData = all.map(r => r.smp);
+    }
 
     chartRef.current?.destroy();
     chartRef.current = new Chart(canvasRef.current, {
@@ -169,10 +126,10 @@ export default function ProductDetailChart({ series }: Props) {
   }, [series]);
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}>
-        <div className={styles.title}>주문수 & 샘플 출고 추이</div>
-        <div style={{ display: "flex", gap: 8 }}>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>주문수 & 샘플 출고 추이</div>
+        <div style={{ display: "flex", gap: "8px" }}>
           {["대일권", "위클리", "먼슬리", "전체"].map(tab => (
             <button
               key={tab}
@@ -182,7 +139,7 @@ export default function ProductDetailChart({ series }: Props) {
               }}
               style={{
                 padding: "4px 10px",
-                fontSize: 11,
+                fontSize: "11px",
                 fontWeight: tabRef.current === tab ? 600 : 400,
                 background: tabRef.current === tab ? "#3b82f6" : "#e5e7eb",
                 color: tabRef.current === tab ? "white" : "#666",
