@@ -45,29 +45,34 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
 
-  // 전체: 2026년만 필터링 후 월별 집계
-  const filtered2026 = data.filter(r => r.dt.startsWith("2026"));
+  // 전체: 2026년만 필터링
+  let targetData = data.filter(r => r.dt.startsWith("2026"));
   
-  if (filtered2026.length <= 14) {
+  // 2026년 데이터가 없으면 모든 데이터 사용
+  if (!targetData.length) {
+    targetData = data;
+  }
+  
+  if (targetData.length <= 14) {
     return {
-      labels: filtered2026.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-      rows: filtered2026,
+      labels: targetData.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      rows: targetData,
     };
   }
   
-  if (filtered2026.length <= 60) {
+  if (targetData.length <= 60) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < filtered2026.length; i += 3) {
-      sampled.push(filtered2026[i]);
-      labels.push(filtered2026[i].dt.slice(2, 4) + "/" + filtered2026[i].dt.slice(4, 6));
+    for (let i = 0; i < targetData.length; i += 3) {
+      sampled.push(targetData[i]);
+      labels.push(targetData[i].dt.slice(2, 4) + "/" + targetData[i].dt.slice(4, 6));
     }
     return { labels, rows: sampled };
   }
 
   // 월별 데이터 합계
   const monthMap: Record<string, DailyRow[]> = {};
-  for (const r of filtered2026) {
+  for (const r of targetData) {
     const m = r.dt.slice(0, 4);
     if (!monthMap[m]) monthMap[m] = [];
     monthMap[m].push(r);
@@ -75,6 +80,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 
   const labels: string[] = [];
   const rows: DailyRow[] = [];
+  
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
@@ -92,6 +98,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
     rows.push(summedRow);
   }
+  
   return { labels, rows };
 }
 
@@ -178,7 +185,19 @@ export default function DailyCharts({ data, activeQuick }: Props) {
 
   if (!labels.length || !rows.length) {
     return (
-      <div style={{ textAlign: "center", padding: "20px", color: "#999" }}>
+      <div style={{ 
+        background: "var(--card)", 
+        border: "1px solid var(--border)", 
+        borderRadius: "var(--radius)", 
+        padding: "40px 20px", 
+        textAlign: "center", 
+        color: "#999",
+        gridColumn: "1 / -1",
+        minHeight: "200px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center"
+      }}>
         데이터가 없어요
       </div>
     );
