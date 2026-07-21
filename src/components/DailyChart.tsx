@@ -61,7 +61,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
-  // 월별 데이터 합계
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -158,8 +157,10 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
   }, [labels, datasets, is30Day]);
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}><div className={styles.title}>{title}</div></div>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>{title}</div>
+      </div>
       <div style={{ position: "relative", height: 200 }}>
         <canvas ref={canvasRef} />
       </div>
@@ -176,7 +177,7 @@ export default function DailyCharts({ data, activeQuick }: Props) {
       <div style={{ 
         background: "var(--card)", 
         border: "1px solid var(--border)", 
-        borderRadius: "var(--radius)", 
+        borderRadius: "8px", 
         padding: "40px 20px", 
         textAlign: "center", 
         color: "#999",
