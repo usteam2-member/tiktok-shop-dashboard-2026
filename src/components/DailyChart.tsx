@@ -61,6 +61,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     return { labels, rows: sampled };
   }
 
+  // 월별 데이터 합계
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -73,7 +74,19 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
-    rows.push(chunk[Math.floor(chunk.length / 2)]);
+    
+    // 월별 전체 데이터 합계
+    const summedRow: DailyRow = {
+      dt: m + "01",
+      krw: chunk.reduce((sum, r) => sum + r.krw, 0),
+      ord: chunk.reduce((sum, r) => sum + r.ord, 0),
+      smp: chunk.reduce((sum, r) => sum + r.smp, 0),
+      aff: chunk.reduce((sum, r) => sum + r.aff, 0),
+      adCost: chunk.reduce((sum, r) => sum + r.adCost, 0),
+      roas: chunk.reduce((sum, r) => sum + r.roas, 0) / chunk.length,
+      unitPriceUsd: chunk.reduce((sum, r) => sum + r.unitPriceUsd, 0) / chunk.length,
+    };
+    rows.push(summedRow);
   }
   return { labels, rows };
 }
