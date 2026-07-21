@@ -42,16 +42,28 @@ export default function DashboardPage() {
   const handleQuick = useCallback((days: number | null) => {
     if (!data?.daily.length) return;
     setActiveQuick(days);
-    const allDates = data.daily;
-    const lastDt = allDates[allDates.length - 1].dt;
-    const endD = dtToDate(lastDt);
+    
+    // "오늘"을 2026-07-21로 고정
+    const today = new Date("2026-07-21");
+    let endD: Date;
     let startD: Date;
+
     if (days === null) {
+      // 전체: 첫 날부터 마지막 데이터 날짜까지
+      const allDates = data.daily;
       startD = dtToDate(allDates[0].dt);
+      endD = dtToDate(allDates[allDates.length - 1].dt);
+    } else if (days === 1) {
+      // 오늘: 2026-07-21 고정
+      startD = today;
+      endD = today;
     } else {
-      startD = new Date(endD);
-      startD.setDate(endD.getDate() - days + 1);
+      // 최근 N일: 오늘(7/21)을 기준으로 계산
+      endD = today;
+      startD = new Date(today);
+      startD.setDate(today.getDate() - days + 1);
     }
+
     const s = fmt(startD);
     const e = fmt(endD);
     setStartDate(s);
@@ -65,8 +77,8 @@ export default function DashboardPage() {
   const kpiData = useMemo(() => {
     if (!data) return [];
     if (activeQuick === 1) {
-      const last = data.daily[data.daily.length - 1];
-      return last ? [last] : [];
+      // 오늘: 2026-07-21 데이터만
+      return data.daily.filter(d => d.dt === "20260721");
     }
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate, activeQuick]);
@@ -74,11 +86,11 @@ export default function DashboardPage() {
   const chartData = useMemo(() => {
     if (!data) return [];
     if (activeQuick === 1) {
-      const allDates = data.daily;
-      const lastDt = dtToDate(allDates[allDates.length - 1].dt);
-      const sevenAgo = new Date(lastDt);
-      sevenAgo.setDate(lastDt.getDate() - 6);
-      return filterByRange(fmt(sevenAgo), fmt(lastDt), allDates);
+      // 오늘 클릭 시: 최근 7일(7/15~7/21) 차트
+      const today = new Date("2026-07-21");
+      const sevenAgo = new Date(today);
+      sevenAgo.setDate(today.getDate() - 6);
+      return filterByRange(fmt(sevenAgo), fmt(today), data.daily);
     }
     return filterByRange(startDate, endDate, data.daily);
   }, [data, startDate, endDate, activeQuick]);
