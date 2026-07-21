@@ -43,25 +43,17 @@ export default function DashboardPage() {
     if (!data?.daily.length) return;
     setActiveQuick(days);
     
-    // "오늘"을 2026-07-21로 고정
-    const today = new Date("2026-07-21");
-    let endD: Date;
+    const allDates = data.daily;
+    const endD = dtToDate(allDates[allDates.length - 1].dt);
     let startD: Date;
 
     if (days === null) {
-      // 전체: 첫 날부터 마지막 데이터 날짜까지
-      const allDates = data.daily;
       startD = dtToDate(allDates[0].dt);
-      endD = dtToDate(allDates[allDates.length - 1].dt);
     } else if (days === 1) {
-      // 오늘: 2026-07-21 고정
-      startD = today;
-      endD = today;
+      startD = endD;
     } else {
-      // 최근 N일: 오늘(7/21)을 기준으로 계산
-      endD = today;
-      startD = new Date(today);
-      startD.setDate(today.getDate() - days + 1);
+      startD = new Date(endD);
+      startD.setDate(endD.getDate() - days + 1);
     }
 
     const s = fmt(startD);
@@ -76,24 +68,13 @@ export default function DashboardPage() {
 
   const kpiData = useMemo(() => {
     if (!data) return [];
-    if (activeQuick === 1) {
-      // 오늘: 2026-07-21 데이터만
-      return data.daily.filter(d => d.dt === "20260721");
-    }
     return filterByRange(startDate, endDate, data.daily);
-  }, [data, startDate, endDate, activeQuick]);
+  }, [data, startDate, endDate]);
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    if (activeQuick === 1) {
-      // 오늘 클릭 시: 최근 7일(7/15~7/21) 차트
-      const today = new Date("2026-07-21");
-      const sevenAgo = new Date(today);
-      sevenAgo.setDate(today.getDate() - 6);
-      return filterByRange(fmt(sevenAgo), fmt(today), data.daily);
-    }
     return filterByRange(startDate, endDate, data.daily);
-  }, [data, startDate, endDate, activeQuick]);
+  }, [data, startDate, endDate]);
 
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
@@ -108,8 +89,6 @@ export default function DashboardPage() {
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
-
-  const chartActiveQuick = activeQuick === 1 ? 7 : activeQuick;
 
   const productDetails = useMemo(() => {
     if (!data?.products) return [];
@@ -152,7 +131,7 @@ export default function DashboardPage() {
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
             <KpiRow data={kpiData} />
-            <DailyCharts data={chartData} activeQuick={chartActiveQuick} />
+            <DailyCharts data={chartData} activeQuick={activeQuick} />
             <div className={styles.fullWidth}>
               <ThisMonthChart
                 data={top10Data}
