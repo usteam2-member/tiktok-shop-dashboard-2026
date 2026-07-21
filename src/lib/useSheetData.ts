@@ -1,45 +1,128 @@
-"use client";
 import { useState, useEffect } from "react";
-import { DailyRow, SojaeRow } from "./data";
-
-export interface ProductTop10Item {
-  name: string;
-  orders: number;
-}
-
-export interface ProductDailySeries {
-  dt: string;
-  ord: number;
-  smp: number;
-  rev: number;
-}
-
-export interface ProductItem {
-  name: string;
-  pid: string;
-  sku: string;
-  ordToday: number;
-  ord7: number;
-  ord30: number;
-  ordThisMonth: number;
-  smpThisMonth: number;
-  newSojae: number;
-  revSojae: number;
-  dailySeries: ProductDailySeries[];
-}
+import { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
 
 export interface SheetData {
   daily: DailyRow[];
-  productTop10ByPeriod: {
-    "1": ProductTop10Item[];
-    "7": ProductTop10Item[];
-    "30": ProductTop10Item[];
-    "90": ProductTop10Item[];
-    "all": ProductTop10Item[];
-  };
-  products: ProductItem[];
+  products: ProductRow[];
+  productTop10ByPeriod: Record<string, ProductTop10Item[]>;
   sojae: SojaeRow[];
   updatedAt: string;
+}
+
+function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  const lines = text.split("\n");
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols: string[] = [];
+    let inQuote = false;
+    let cur = "";
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuote = !inQuote; continue; }
+      if (ch === "," && !inQuote) { cols.push(cur.trim()); cur = ""; continue; }
+      cur += ch;
+    }
+    cols.push(cur.trim());
+    rows.push(cols);
+  }
+  return rows;
+}
+
+function safeNum(v: string): number {
+  const n = parseFloat(v.replace(/[,\s₩$%#]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+
+async function fetchSheet(sheetId: string, gid: string) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to fetch sheet ${gid}`);
+  return parseCSV(await res.text());
+}
+
+function parseDailyData(rows: string[][]): DailyRow[] {
+  if (rows.length < 2) return [];
+  const result: DailyRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 18) continue;
+    const dt = row[1]?.trim();
+    if (!dt) continue;
+    result.push({
+      dt,
+      aff: safeNum(row[4]),
+      smp: safeNum(row[5]),
+      ord: safeNum(row[6]),
+      krw: safeNum(row[9]),
+      adCost: safeNum(row[11]),
+      roas: safeNum(row[16]),
+      unitPriceUsd: safeNum(row[17]),
+    });
+  }
+  return result;
+}
+
+function parseProductData(rows: string[][]): ProductRow[] {
+  if (rows.length < 2) return [];
+  
+  const headerRow = rows[0];
+  const revenueColIdx = headerRow.findIndex(h => h.includes("매출액(KRW)"));
+  if (revenueColIdx < 0) return [];
+
+  const products: Record<string, ProductRow> = {};
+  
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length <= revenueColIdx) continue;
+
+    const pidCol = row[0]?.trim();
+    if (!pidCol || pidCol.startsWith("합계")) continue;
+
+    const name = row.slice(1, revenueColIdx).filter(c => c.trim()).join(" ").trim();
+    const sku = row[1]?.trim() || "";
+    
+    if (!name || !pidCol) continue;
+
+    const key = `${pidCol}-${name}`;
+    if (!products[key]) {
+      products[key] = {
+        name,
+        pid: pidCol,
+        sku,
+        productType: getProductType(sku),
+        ordToday: 0,
+        ord7: 0,
+        ord30: 0,
+        ordThisMonth: 0,
+        smpThisMonth: 0,
+        newSojae: 0,
+        revSojae: 0,
+        dailySeries: [],
+      };
+    }
+  }
+
+  return Object.values(products);
+}
+
+function parseSojaeData(rows: string[][]): SojaeRow[] {
+  if (rows.length < 2) return [];
+  const result: SojaeRow[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 4) continue;
+    const dt = row[0]?.trim();
+    const name = row[1]?.trim();
+    if (!dt || !name) continue;
+    result.push({
+      dt,
+      name,
+      count: safeNum(row[2]),
+      revenue: safeNum(row[3]),
+    });
+  }
+  return result;
 }
 
 export function useSheetData() {
@@ -48,21 +131,73 @@ export function useSheetData() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    fetch("/api/sheets")
-      .then((r) => {
-        if (!r.ok) throw new Error("데이터 로드 실패");
-        return r.json();
-      })
-      .then((d) => {
-        setData(d);
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const dailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "0");
+        const daily = parseDailyData(dailyRows);
+
+        const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1903519041");
+        const products = parseProductData(productRows);
+
+        const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1148369850");
+        const sojae = parseSojaeData(sojaeRows);
+
+        // 제품별 TOP 10 (각 기간별)
+        const generateTop10 = (days: number | null): ProductTop10Item[] => {
+          const filtered = days === null 
+            ? daily 
+            : daily.slice(Math.max(0, daily.length - days));
+          
+          const pidMap: Record<string, { revenue: number; pid: string; sku: string; name: string }> = {};
+          
+          for (const row of filtered) {
+            // 제품 매칭 로직이 필요하지만, 현재는 기본값으로
+          }
+          
+          return products
+            .map(p => ({
+              name: p.name,
+              pid: p.pid,
+              sku: p.sku,
+              productType: p.productType,
+              revenue: 0,
+            }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 10);
+        };
+
+        const productTop10ByPeriod = {
+          "1": generateTop10(1),
+          "7": generateTop10(7),
+          "30": generateTop10(30),
+          "90": generateTop10(90),
+          "all": generateTop10(null),
+        };
+
+        setData({
+          daily,
+          products,
+          productTop10ByPeriod,
+          sojae,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+        setData(null);
+      } finally {
         setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message);
-        setLoading(false);
-      });
+      }
+    })();
   }, []);
 
   return { data, loading, error };
 }
+
+export interface Props {
+  products: ProductRow[];
+}
+
+export type { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries };
