@@ -1,143 +1,161 @@
 "use client";
-import { useState } from "react";
-import { ProductRow } from "@/lib/data";
-import ProductDetailChart from "@/components/ProductDetailChart";
+import { useEffect, useRef } from "react";
+import { Chart, registerables } from "chart.js";
+import { ProductDailySeries } from "@/lib/data";
+
+Chart.register(...registerables);
 
 interface Props {
-  products: ProductRow[];
+  series: ProductDailySeries[];
 }
 
-export default function ProductSearch({ products }: Props) {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<ProductRow | null>(null);
+export default function ProductDetailChart({ series }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+  const tabRef = useRef("먼슬리");
 
-  const filtered = query.trim()
-    ? products.filter(p =>
-        p.name.toLowerCase().includes(query.toLowerCase()) ||
-        p.pid.includes(query) ||
-        p.sku.toLowerCase().includes(query.toLowerCase())
-      )
-    : [];
+  const updateChart = () => {
+    if (!canvasRef.current || !series.length) return;
+
+    const all = [...series].sort((a, b) => a.dt.localeCompare(b.dt));
+    if (!all.length) return;
+
+    let labels: string[] = [];
+    let ordData: number[] = [];
+    let smpData: number[] = [];
+
+    if (tabRef.current === "대일권") {
+      labels = all.slice(-14).map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.slice(-14).map(r => r.ord);
+      smpData = all.slice(-14).map(r => r.smp);
+    } else if (tabRef.current === "위클리") {
+      labels = all.slice(-7).map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.slice(-7).map(r => r.ord);
+      smpData = all.slice(-7).map(r => r.smp);
+    } else {
+      labels = all.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6));
+      ordData = all.map(r => r.ord);
+      smpData = all.map(r => r.smp);
+    }
+
+    chartRef.current?.destroy();
+    chartRef.current = new Chart(canvasRef.current, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "주문수",
+            data: ordData,
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59,130,246,0.07)",
+            borderWidth: 2,
+            pointRadius: 3,
+            fill: true,
+            tension: 0.35,
+            yAxisID: "yLeft",
+          },
+          {
+            label: "샘플 출고",
+            data: smpData,
+            borderColor: "#ef4444",
+            borderDash: [5, 4],
+            backgroundColor: "transparent",
+            borderWidth: 1.5,
+            pointRadius: 3,
+            fill: false,
+            tension: 0.35,
+            yAxisID: "yRight",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: "#64748b",
+              boxWidth: 20,
+              boxHeight: 2,
+              padding: 14,
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: "#94a3b8",
+              font: { size: 10 },
+              maxRotation: 30,
+              autoSkip: false,
+            },
+            grid: { color: "#e2e6ea", lineWidth: 0.5 },
+          },
+          yLeft: {
+            position: "left",
+            beginAtZero: true,
+            ticks: {
+              color: "#3b82f6",
+              font: { size: 10 },
+              callback: (v) => (v as number).toLocaleString(),
+            },
+            grid: { color: "#e2e6ea", lineWidth: 0.5 },
+          },
+          yRight: {
+            position: "right",
+            beginAtZero: true,
+            ticks: {
+              color: "#94a3b8",
+              font: { size: 10 },
+              callback: (v) => (v as number).toLocaleString(),
+            },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  };
+
+  useEffect(() => {
+    updateChart();
+  }, [series]);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <div style={{ display: "flex", gap: "8px", marginBottom: "16px", alignItems: "center" }}>
-        <span style={{ fontSize: "18px" }}>🔍</span>
-        <input
-          style={{
-            flex: 1,
-            padding: "8px 12px",
-            border: "1px solid var(--border)",
-            borderRadius: "6px",
-            fontSize: "14px",
-          }}
-          placeholder="제품명, PID, SKU로 검색..."
-          value={query}
-          onChange={e => { setQuery(e.target.value); setSelected(null); }}
-        />
-        {query && (
-          <button
-            style={{ padding: "6px 12px", background: "#e5e7eb", border: "none", borderRadius: "4px", cursor: "pointer" }}
-            onClick={() => { setQuery(""); setSelected(null); }}
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      {!selected && filtered.length > 0 && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: "8px", overflow: "hidden", marginBottom: "16px" }}>
-          <div style={{ background: "var(--card)", padding: "12px 16px", display: "flex", justifyContent: "space-between", fontWeight: 600, borderBottom: "1px solid var(--border)" }}>
-            <span>제품</span>
-            <div style={{ display: "flex", gap: "40px" }}>
-              <span>이번달 주문</span>
-              <span>이번달 샘플</span>
-              <span>신규 소재</span>
-            </div>
-          </div>
-          {filtered.map(p => (
-            <div
-              key={p.name}
-              onClick={() => setSelected(p)}
-              style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--border)",
-                cursor: "pointer",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "var(--card)",
-                transition: "background 0.2s",
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>주문수 & 샘플 출고 추이</div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {["대일권", "위클리", "먼슬리", "전체"].map(tab => (
+            <button
+              key={tab}
+              onClick={() => {
+                tabRef.current = tab;
+                updateChart();
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "#f8fafc")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--card)")}
+              style={{
+                padding: "4px 10px",
+                fontSize: "11px",
+                fontWeight: tabRef.current === tab ? 600 : 400,
+                background: tabRef.current === tab ? "#3b82f6" : "#e5e7eb",
+                color: tabRef.current === tab ? "white" : "#666",
+                border: "none",
+                borderRadius: 4,
+                cursor: "pointer",
+              }}
             >
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text)" }}>
-                  <span style={{ marginRight: "6px", fontSize: "11px", color: "#94a3b8" }}>{p.productType}</span>
-                  {p.name}
-                </div>
-                {p.pid && <div style={{ fontSize: "11px", color: "#94a3b8" }}>PID: {p.pid}</div>}
-              </div>
-              <div style={{ display: "flex", gap: "40px", textAlign: "right" }}>
-                <span style={{ fontSize: "12px", color: "var(--text)" }}>{p.ordThisMonth.toLocaleString()}</span>
-                <span style={{ fontSize: "12px", color: "var(--text)" }}>{p.smpThisMonth.toLocaleString()}</span>
-                <span style={{ fontSize: "12px", color: "var(--text)" }}>{p.newSojae.toLocaleString()}</span>
-              </div>
-            </div>
+              {tab}
+            </button>
           ))}
         </div>
-      )}
-
-      {!selected && query && filtered.length === 0 && (
-        <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>검색 결과가 없어요 😅</div>
-      )}
-
-      {selected && (
-        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
-          <button
-            onClick={() => setSelected(null)}
-            style={{ padding: "6px 12px", background: "#e5e7eb", border: "none", borderRadius: "4px", cursor: "pointer", marginBottom: "12px" }}
-          >
-            ← 목록으로
-          </button>
-          <h2 style={{ fontSize: "16px", fontWeight: 600, margin: "12px 0", color: "var(--text)" }}>
-            <span style={{ marginRight: "8px", fontSize: "13px", color: "#94a3b8" }}>{selected.productType}</span>
-            {selected.name}
-          </h2>
-          {selected.pid && <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px" }}>PID: {selected.pid}</div>}
-          {selected.sku && <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "12px" }}>SKU: {selected.sku}</div>}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "16px" }}>
-            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px" }}>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>오늘 주문수</div>
-              <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)" }}>{selected.ordToday.toLocaleString()}</div>
-            </div>
-            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px" }}>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>최근 7일 주문수</div>
-              <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)" }}>{selected.ord7.toLocaleString()}</div>
-            </div>
-            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px" }}>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>최근 30일 주문수</div>
-              <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)" }}>{selected.ord30.toLocaleString()}</div>
-            </div>
-            <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px" }}>
-              <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px" }}>이번달 주문수</div>
-              <div style={{ fontSize: "16px", fontWeight: 600, color: "var(--text)" }}>{selected.ordThisMonth.toLocaleString()}</div>
-            </div>
-          </div>
-
-          <ProductDetailChart series={selected.dailySeries} />
-        </div>
-      )}
-
-      {!query && !selected && (
-        <div style={{ textAlign: "center", color: "#999", padding: "40px 20px" }}>
-          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔍</div>
-          <div style={{ fontSize: "14px", marginBottom: "6px" }}>제품명, PID, SKU를 입력해서 검색해보세요</div>
-          <div style={{ fontSize: "12px" }}>총 {products.length}개 제품</div>
-        </div>
-      )}
+      </div>
+      <div style={{ position: "relative", height: 240 }}>
+        <canvas ref={canvasRef} />
+      </div>
     </div>
   );
 }
