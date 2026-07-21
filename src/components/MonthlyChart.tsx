@@ -2,18 +2,11 @@
 import { useEffect, useRef } from "react";
 import { Chart, registerables } from "chart.js";
 import { SojaeRow } from "@/lib/data";
-import styles from "./ChartCard.module.css";
 
 Chart.register(...registerables);
 
 interface Props {
   data: SojaeRow[];
-}
-
-interface MonthlyData {
-  month: string;
-  newCount: number;
-  revCount: number;
 }
 
 export default function MonthlyChart({ data }: Props) {
@@ -23,16 +16,14 @@ export default function MonthlyChart({ data }: Props) {
   useEffect(() => {
     if (!canvasRef.current || !data.length) return;
 
-    // 월별로 데이터 그룹화
     const monthMap: Record<string, { newCount: number; revCount: number }> = {};
     
     for (const row of data) {
-      const month = row.dt.slice(0, 6); // YYYYMM
+      const month = row.dt.slice(0, 6);
       if (!monthMap[month]) {
         monthMap[month] = { newCount: 0, revCount: 0 };
       }
       
-      // name에 "신규" 또는 "매출" 포함 여부로 구분
       if (row.name.includes("신규")) {
         monthMap[month].newCount += row.count;
       } else {
@@ -40,7 +31,6 @@ export default function MonthlyChart({ data }: Props) {
       }
     }
 
-    // 월별 레이블 변환
     const MONTH_LABEL: Record<string, string> = {
       "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
       "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
@@ -114,9 +104,9 @@ export default function MonthlyChart({ data }: Props) {
   }, [data]);
 
   return (
-    <div className={styles.card}>
-      <div className={styles.header}>
-        <div className={styles.title}>월별 소재 현황 (신규 · 매출 소재)</div>
+    <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px" }}>
+      <div style={{ marginBottom: "12px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>월별 소재 현황 (신규 · 매출 소재)</div>
       </div>
       <div style={{ position: "relative", height: 240 }}>
         <canvas ref={canvasRef} />
