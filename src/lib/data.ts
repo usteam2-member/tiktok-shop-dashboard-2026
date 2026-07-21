@@ -14,7 +14,7 @@ export interface ProductRow {
   pid: string;
   sku: string;
   productType: string;
-  totalRevenue: number; // ← 추가!
+  totalRevenue: number;
   ordToday: number;
   ord7: number;
   ord30: number;
@@ -62,7 +62,10 @@ export function fmtKRW(n: number): string {
 }
 
 export function filterByRange(start: string, end: string, rows: DailyRow[]): DailyRow[] {
-  return rows.filter(r => r.dt >= start && r.dt <= end);
+  // start = "2026-01-01" (YYYY-MM-DD) → "20260101" (YYYYMMDD)
+  const startDt = start.replace(/-/g, "");
+  const endDt = end.replace(/-/g, "");
+  return rows.filter(r => r.dt >= startDt && r.dt <= endDt);
 }
 
 export function getProductType(sku: string): string {
