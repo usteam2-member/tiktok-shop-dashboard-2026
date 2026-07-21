@@ -1,55 +1,22 @@
 "use client";
-import { useRouter, usePathname } from "next/navigation";
-
-const TABS = [
-  { icon: "📊", label: "대시보드", href: "/dashboard" },
-  { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
-  { icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
-];
-
 interface Props {
-  activeTab?: string;
+  startDate: string;
+  endDate: string;
 }
 
-export default function TabBar({ activeTab }: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
-
+export default function Navbar({ startDate, endDate }: Props) {
   return (
-    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
-      {TABS.map((t) => {
-        let isActive = false;
-        if (activeTab) {
-          isActive = activeTab === t.label;
-        } else {
-          if (t.href === "/dashboard") {
-            isActive = pathname === "/dashboard";
-          } else {
-            isActive = pathname.startsWith(t.href);
-          }
-        }
-        return (
-          <div
-            key={t.label}
-            onClick={() => router.push(t.href)}
-            style={{
-              padding: "12px 16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: isActive ? 600 : 400,
-              color: isActive ? "var(--text)" : "var(--muted)",
-              borderBottom: isActive ? "2px solid #3b82f6" : "none",
-              transition: "all 0.2s",
-            }}
-          >
-            <span>{t.icon}</span>
-            <span>{t.label}</span>
-          </div>
-        );
-      })}
+    <div style={{ background: "#1f2937", color: "white", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div>
+        <h1 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 4px 0" }}>TikTok Shop 매출 대시보드</h1>
+        <div style={{ fontSize: "12px", color: "#d1d5db" }}>조회 기간: {startDate} ~ {endDate}</div>
+      </div>
+      <div style={{ display: "flex", gap: "12px", fontSize: "12px" }}>
+        <button style={{ padding: "6px 12px", background: "#3b82f6", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>설정/에디터</button>
+        <button style={{ padding: "6px 12px", background: "#6b7280", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>삼 문서</button>
+        <button style={{ padding: "6px 12px", background: "#6b7280", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>재공할</button>
+        <button style={{ padding: "6px 12px", background: "#6b7280", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}>소개</button>
+      </div>
     </div>
   );
 }
