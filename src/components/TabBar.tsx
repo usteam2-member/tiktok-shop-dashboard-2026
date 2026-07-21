@@ -1,6 +1,5 @@
 "use client";
 import { useRouter, usePathname } from "next/navigation";
-import styles from "./TabBar.module.css";
 
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
@@ -17,13 +16,12 @@ export default function TabBar({ activeTab }: Props) {
   const pathname = usePathname();
 
   return (
-    <div className={styles.bar}>
+    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
       {TABS.map((t) => {
         let isActive = false;
         if (activeTab) {
           isActive = activeTab === t.label;
         } else {
-          // 대시보드는 정확히 매칭, 다른 탭은 부분 매칭
           if (t.href === "/dashboard") {
             isActive = pathname === "/dashboard";
           } else {
@@ -33,8 +31,19 @@ export default function TabBar({ activeTab }: Props) {
         return (
           <div
             key={t.label}
-            className={styles.tab + (isActive ? " " + styles.active : "")}
             onClick={() => router.push(t.href)}
+            style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? "var(--text)" : "var(--muted)",
+              borderBottom: isActive ? "2px solid #3b82f6" : "none",
+              transition: "all 0.2s",
+            }}
           >
             <span>{t.icon}</span>
             <span>{t.label}</span>
