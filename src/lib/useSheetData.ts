@@ -42,24 +42,39 @@ async function fetchSheet(sheetId: string, gid: string) {
 }
 
 function parseDailyData(rows: string[][]): DailyRow[] {
-  if (rows.length < 2) return [];
+  if (rows.length < 5) return [];
+  
   const result: DailyRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
+  
+  // Row 4 (rows[3])가 헤더, Row 5 (rows[4])부터 데이터
+  for (let i = 4; i < rows.length; i++) {
     const row = rows[i];
-    if (!row || row.length < 18) continue;
-    const dt = row[1]?.trim();
-    if (!dt) continue;
+    if (!row || row.length < 9) continue;
+    
+    // B열 (row[1]) = 날짜 (YYMMDD 형식)
+    let dt = row[1]?.trim();
+    if (!dt || dt.length !== 6 || isNaN(parseInt(dt))) continue;
+    
+    // YYMMDD를 YYYYMMDD로 변환
+    const yy = parseInt(dt.slice(0, 2));
+    const mm = dt.slice(2, 4);
+    const dd = dt.slice(4, 6);
+    dt = `20${yy}${mm}${dd}`;
+    
+    // 열 인덱스 (0-based):
+    // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, ..., M=12, ..., Q=16, R=17, S=18
     result.push({
       dt,
-      aff: safeNum(row[4]),
-      smp: safeNum(row[5]),
-      ord: safeNum(row[6]),
-      krw: safeNum(row[9]),
-      adCost: safeNum(row[11]),
-      roas: safeNum(row[16]),
-      unitPriceUsd: safeNum(row[17]),
+      aff: safeNum(row[4] || "0"),      // E열: affiliate_upload
+      smp: safeNum(row[5] || "0"),      // F열: sample_orders
+      ord: safeNum(row[6] || "0"),      // G열: orders
+      krw: safeNum(row[7] || "0"),      // H열: 매출_계약(KRW)
+      adCost: safeNum(row[12] || "0"),  // M열: GMV ads
+      roas: safeNum(row[16] || "0"),    // Q열: ROAS
+      unitPriceUsd: safeNum(row[17] || "0"), // R열: 객단가(USD)
     });
   }
+  
   return result;
 }
 
