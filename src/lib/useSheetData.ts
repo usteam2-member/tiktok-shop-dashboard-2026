@@ -143,10 +143,10 @@ export function useSheetData() {
         const dailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "0");
         const daily = parseDailyData(dailyRows);
 
-        const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1903519041");
+        const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
         const products = parseProductData(productRows);
 
-        const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1148369850");
+        const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
         const sojae = parseSojaeData(sojaeRows);
 
         // 제품별 TOP 10 (각 기간별)
