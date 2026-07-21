@@ -13,7 +13,8 @@ export interface ProductRow {
   name: string;
   pid: string;
   sku: string;
-  productType: string; // "(단품)" 또는 "(번들)"
+  productType: string;
+  totalRevenue: number; // ← 추가!
   ordToday: number;
   ord7: number;
   ord30: number;
