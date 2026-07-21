@@ -2,7 +2,6 @@
 import { useEffect, useRef } from "react";
 import { Chart, registerables } from "chart.js";
 import { DailyRow } from "@/lib/data";
-import styles from "./ChartCard.module.css";
 
 Chart.register(...registerables);
 
