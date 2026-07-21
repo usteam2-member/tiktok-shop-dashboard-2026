@@ -45,34 +45,26 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
 
-  // 전체: 2026년만 필터링
-  let targetData = data.filter(r => r.dt.startsWith("2026"));
-  
-  // 2026년 데이터가 없으면 모든 데이터 사용
-  if (!targetData.length) {
-    targetData = data;
-  }
-  
-  if (targetData.length <= 14) {
+  if (data.length <= 14) {
     return {
-      labels: targetData.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-      rows: targetData,
+      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      rows: data,
     };
   }
   
-  if (targetData.length <= 60) {
+  if (data.length <= 60) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < targetData.length; i += 3) {
-      sampled.push(targetData[i]);
-      labels.push(targetData[i].dt.slice(2, 4) + "/" + targetData[i].dt.slice(4, 6));
+    for (let i = 0; i < data.length; i += 3) {
+      sampled.push(data[i]);
+      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
     }
     return { labels, rows: sampled };
   }
 
   // 월별 데이터 합계
   const monthMap: Record<string, DailyRow[]> = {};
-  for (const r of targetData) {
+  for (const r of data) {
     const m = r.dt.slice(0, 4);
     if (!monthMap[m]) monthMap[m] = [];
     monthMap[m].push(r);
@@ -80,12 +72,10 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 
   const labels: string[] = [];
   const rows: DailyRow[] = [];
-  
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
     
-    // 월별 전체 데이터 합계
     const summedRow: DailyRow = {
       dt: m + "01",
       krw: chunk.reduce((sum, r) => sum + r.krw, 0),
@@ -98,7 +88,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
     rows.push(summedRow);
   }
-  
   return { labels, rows };
 }
 
