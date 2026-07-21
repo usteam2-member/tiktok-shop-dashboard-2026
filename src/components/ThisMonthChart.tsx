@@ -54,13 +54,14 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
                     {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
                     {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
                     {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
+                    <span style={{ marginRight: 6, fontSize: 11, color: "#94a3b8" }}>{p.productType}</span>
                     {p.name}
                   </td>
                   <td style={{ padding: "10px 10px", color: "#94a3b8", fontSize: 11 }}>
-                    {detail?.pid || "-"}
+                    {detail?.pid || p.pid || "-"}
                   </td>
                   <td style={{ padding: "10px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>
-                    {p.orders.toLocaleString()}
+                    {p.revenue.toLocaleString()}
                   </td>
                   <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--text)" }}>
                     {detail ? detail.smpThisMonth.toLocaleString() : "-"}
