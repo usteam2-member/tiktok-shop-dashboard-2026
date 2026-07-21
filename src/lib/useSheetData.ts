@@ -81,6 +81,7 @@ function parseProductData(rows: string[][]): ProductRow[] {
 
     const name = row.slice(1, revenueColIdx).filter(c => c.trim()).join(" ").trim();
     const sku = row[1]?.trim() || "";
+    const revenue = safeNum(row[revenueColIdx] || "0");
     
     if (!name || !pidCol) continue;
 
@@ -91,6 +92,7 @@ function parseProductData(rows: string[][]): ProductRow[] {
         pid: pidCol,
         sku,
         productType: getProductType(sku),
+        totalRevenue: revenue,
         ordToday: 0,
         ord7: 0,
         ord30: 0,
@@ -100,10 +102,12 @@ function parseProductData(rows: string[][]): ProductRow[] {
         revSojae: 0,
         dailySeries: [],
       };
+    } else {
+      products[key].totalRevenue += revenue;
     }
   }
 
-  return Object.values(products);
+  return Object.values(products).sort((a, b) => b.totalRevenue - a.totalRevenue);
 }
 
 function parseSojaeData(rows: string[][]): SojaeRow[] {
@@ -154,7 +158,7 @@ export function useSheetData() {
               pid: p.pid,
               sku: p.sku,
               productType: p.productType,
-              revenue: 0,
+              revenue: p.totalRevenue,
             }))
             .sort((a, b) => b.revenue - a.revenue);
         };
