@@ -13,7 +13,6 @@ function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
   const lines = text.split("\n");
   for (const line of lines) {
-    if (!line.trim()) continue;
     const cols: string[] = [];
     let inQuote = false;
     let cur = "";
@@ -42,12 +41,14 @@ async function fetchSheet(sheetId: string, gid: string) {
 }
 
 function parseDailyData(rows: string[][]): DailyRow[] {
-  if (rows.length < 5) return [];
+  if (rows.length < 3) return [];
   
   const result: DailyRow[] = [];
   
-  // Row 4 (rows[3])가 헤더, Row 5 (rows[4])부터 데이터
-  for (let i = 4; i < rows.length; i++) {
+  // rows[0] = Row 1 (PID)
+  // rows[1] = Row 4 (헤더)
+  // rows[2]+ = Row 5+ (데이터)
+  for (let i = 2; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 9) continue;
     
@@ -62,7 +63,7 @@ function parseDailyData(rows: string[][]): DailyRow[] {
     dt = `20${yy}${mm}${dd}`;
     
     // 열 인덱스 (0-based):
-    // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, ..., M=12, ..., Q=16, R=17, S=18
+    // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, ..., M=12, ..., Q=16, R=17
     result.push({
       dt,
       aff: safeNum(row[4] || "0"),      // E열: affiliate_upload
@@ -164,7 +165,7 @@ export function useSheetData() {
         const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
         const sojae = parseSojaeData(sojaeRows);
 
-        // 제품별 TOP 10 (각 기간별)
+        // 제품별 TOP 10
         const generateTop10 = (days: number | null): ProductTop10Item[] => {
           return products
             .slice(0, 10)
