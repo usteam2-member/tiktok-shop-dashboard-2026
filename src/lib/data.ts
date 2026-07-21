@@ -8,27 +8,65 @@ export interface DailyRow {
   roas: number;
   unitPriceUsd: number;
 }
-export interface ProductRow { name: string; total: number; }
-export interface SojaeRow { month: string; new: number; rev: number; }
+
+export interface ProductRow {
+  name: string;
+  pid: string;
+  sku: string;
+  productType: string; // "(단품)" 또는 "(번들)"
+  ordToday: number;
+  ord7: number;
+  ord30: number;
+  ordThisMonth: number;
+  smpThisMonth: number;
+  newSojae: number;
+  revSojae: number;
+  dailySeries: ProductDailySeries[];
+}
+
+export interface SojaeRow {
+  dt: string;
+  name: string;
+  count: number;
+  revenue: number;
+}
+
+export interface ProductTop10Item {
+  name: string;
+  pid: string;
+  sku: string;
+  productType: string;
+  revenue: number;
+}
+
+export interface ProductDailySeries {
+  dt: string;
+  ord: number;
+  smp: number;
+}
 
 export function dtToDate(dt: string): Date {
-  const y = 2000 + parseInt(dt.slice(0, 2));
-  const m = parseInt(dt.slice(2, 4)) - 1;
-  const d = parseInt(dt.slice(4, 6));
+  const y = parseInt(dt.slice(0, 4));
+  const m = parseInt(dt.slice(4, 6)) - 1;
+  const d = parseInt(dt.slice(6, 8));
   return new Date(y, m, d);
 }
 
-export function fmtKRW(v: number): string {
-  if (v >= 1e9) return "₩" + (v / 1e9).toFixed(2) + "B";
-  if (v >= 1e6) return "₩" + (v / 1e6).toFixed(0) + "M";
-  return "₩" + Math.round(v).toLocaleString();
+export function fmtKRW(n: number): string {
+  if (n >= 1e12) return (n / 1e12).toFixed(1) + "T";
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(0) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(0) + "K";
+  return n.toFixed(0);
 }
 
-export function filterByRange(start: string, end: string, daily: DailyRow[]): DailyRow[] {
-  const s = new Date(start);
-  const e = new Date(end);
-  return daily.filter((r) => {
-    const d = dtToDate(r.dt);
-    return d >= s && d <= e;
-  });
+export function filterByRange(start: string, end: string, rows: DailyRow[]): DailyRow[] {
+  return rows.filter(r => r.dt >= start && r.dt <= end);
+}
+
+export function getProductType(sku: string): string {
+  if (!sku) return "";
+  if (sku.startsWith("SB")) return "(단품)";
+  if (sku.startsWith("BD")) return "(번들)";
+  return "";
 }
