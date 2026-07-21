@@ -19,19 +19,18 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const { data, loading, error } = useSheetData();
 
-  const [startDate, setStartDate] = useState(searchParams.get("start") || "");
-  const [endDate, setEndDate] = useState(searchParams.get("end") || "");
+  const [startDate, setStartDate] = useState(searchParams.get("start") || "2026-01-01");
+  const [endDate, setEndDate] = useState(searchParams.get("end") || "2026-07-31");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!data || startDate) return;
-    const allDates = data.daily;
-    if (!allDates.length) return;
-    const first = fmt(dtToDate(allDates[0].dt));
-    const last = fmt(dtToDate(allDates[allDates.length - 1].dt));
-    setStartDate(first);
-    setEndDate(last);
-    router.replace(`/dashboard?start=${first}&end=${last}`, { scroll: false });
+    if (!data) return;
+    // 초기 로드 시에만 설정
+    if (searchParams.get("start") === null) {
+      setStartDate("2026-01-01");
+      setEndDate("2026-07-31");
+      router.replace(`/dashboard?start=2026-01-01&end=2026-07-31`, { scroll: false });
+    }
   }, [data]);
 
   const pushParams = useCallback((s: string, e: string) => {
@@ -47,7 +46,7 @@ export default function DashboardPage() {
     let endD: Date;
 
     if (days === null) {
-      // 전체: 2026년만 (2026-01-01 ~ 2026-07-31)
+      // 전체: 2026년 전체
       startD = new Date("2026-01-01");
       endD = new Date("2026-07-31");
     } else if (days === 1) {
