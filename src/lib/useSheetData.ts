@@ -147,17 +147,8 @@ export function useSheetData() {
 
         // 제품별 TOP 10 (각 기간별)
         const generateTop10 = (days: number | null): ProductTop10Item[] => {
-          const filtered = days === null 
-            ? daily 
-            : daily.slice(Math.max(0, daily.length - days));
-          
-          const pidMap: Record<string, { revenue: number; pid: string; sku: string; name: string }> = {};
-          
-          for (const row of filtered) {
-            // 제품 매칭 로직이 필요하지만, 현재는 기본값으로
-          }
-          
           return products
+            .slice(0, 10)
             .map(p => ({
               name: p.name,
               pid: p.pid,
@@ -165,8 +156,7 @@ export function useSheetData() {
               productType: p.productType,
               revenue: 0,
             }))
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 10);
+            .sort((a, b) => b.revenue - a.revenue);
         };
 
         const productTop10ByPeriod = {
