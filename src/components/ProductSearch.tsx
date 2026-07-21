@@ -1,16 +1,16 @@
 "use client";
 import { useState } from "react";
-import { ProductItem } from "@/lib/useSheetData";
+import { ProductRow } from "@/lib/data";
 import ProductDetailChart from "@/components/ProductDetailChart";
 import styles from "./ProductSearch.module.css";
 
 interface Props {
-  products: ProductItem[];
+  products: ProductRow[];
 }
 
 export default function ProductSearch({ products }: Props) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<ProductItem | null>(null);
+  const [selected, setSelected] = useState<ProductRow | null>(null);
 
   const filtered = query.trim()
     ? products.filter(p =>
@@ -48,7 +48,12 @@ export default function ProductSearch({ products }: Props) {
           {filtered.map(p => (
             <div key={p.name} className={styles.resultRow} onClick={() => setSelected(p)}>
               <div className={styles.resultLeft}>
-                <div className={styles.resultName}>{p.name}</div>
+                <div className={styles.resultName}>
+                  <span style={{ marginRight: "6px", fontSize: "11px", color: "#94a3b8" }}>
+                    {p.productType}
+                  </span>
+                  {p.name}
+                </div>
                 {p.pid && <div className={styles.resultPid}>PID: {p.pid}</div>}
               </div>
               <div className={styles.resultCols}>
@@ -75,7 +80,12 @@ export default function ProductSearch({ products }: Props) {
         <div className={styles.detail}>
           <button className={styles.back} onClick={() => setSelected(null)}>← 목록으로</button>
           <div className={styles.detailHeader}>
-            <h2 className={styles.detailName}>{selected.name}</h2>
+            <h2 className={styles.detailName}>
+              <span style={{ marginRight: "8px", fontSize: "14px", color: "#94a3b8" }}>
+                {selected.productType}
+              </span>
+              {selected.name}
+            </h2>
             {selected.pid && <div className={styles.detailMeta}>PID: {selected.pid}</div>}
             {selected.sku && <div className={styles.detailMeta}>SKU: {selected.sku}</div>}
           </div>
