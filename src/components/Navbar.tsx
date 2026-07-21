@@ -1,28 +1,55 @@
 "use client";
-import styles from "./Navbar.module.css";
+import { useRouter, usePathname } from "next/navigation";
 
-interface NavbarProps {
-  startDate: string;
-  endDate: string;
+const TABS = [
+  { icon: "📊", label: "대시보드", href: "/dashboard" },
+  { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
+  { icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
+];
+
+interface Props {
+  activeTab?: string;
 }
 
-export default function Navbar({ startDate, endDate }: NavbarProps) {
+export default function TabBar({ activeTab }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   return (
-    <nav className={styles.nav}>
-      <div className={styles.left}>
-        <span className={styles.title}>TikTok Shop 매출 대시보드</span>
-        <span className={styles.sub}>
-          전체 데이터: 2026-01-01 ~ 2026-07-31&nbsp;&nbsp;
-          <span className={styles.range}>조회 기간: {startDate} ~ {endDate}</span>
-        </span>
-      </div>
-      <div className={styles.right}>
-        <span className={styles.pill + " " + styles.prime}>● 성분에디터</span>
-        <span className={styles.pill}>샵 분석</span>
-        <span className={styles.pill}>제품별</span>
-        <span className={styles.pill}>소재</span>
-        <button className={styles.btn}>+ 리포트 내보내기</button>
-      </div>
-    </nav>
+    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
+      {TABS.map((t) => {
+        let isActive = false;
+        if (activeTab) {
+          isActive = activeTab === t.label;
+        } else {
+          if (t.href === "/dashboard") {
+            isActive = pathname === "/dashboard";
+          } else {
+            isActive = pathname.startsWith(t.href);
+          }
+        }
+        return (
+          <div
+            key={t.label}
+            onClick={() => router.push(t.href)}
+            style={{
+              padding: "12px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? "var(--text)" : "var(--muted)",
+              borderBottom: isActive ? "2px solid #3b82f6" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
