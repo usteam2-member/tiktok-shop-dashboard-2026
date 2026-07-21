@@ -159,11 +159,25 @@ export function useSheetData() {
         const dailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "0");
         const daily = parseDailyData(dailyRows);
 
-        const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
-        const products = parseProductData(productRows);
+        // Product 데이터는 선택적으로 로드
+        let products: ProductRow[] = [];
+        try {
+          const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
+          products = parseProductData(productRows);
+        } catch (err) {
+          console.warn("Product sheet loading failed, using empty array");
+          products = [];
+        }
 
-        const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
-        const sojae = parseSojaeData(sojaeRows);
+        // Sojae 데이터도 선택적으로 로드
+        let sojae: SojaeRow[] = [];
+        try {
+          const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
+          sojae = parseSojaeData(sojaeRows);
+        } catch (err) {
+          console.warn("Sojae sheet loading failed, using empty array");
+          sojae = [];
+        }
 
         // 제품별 TOP 10
         const generateTop10 = (days: number | null): ProductTop10Item[] => {
