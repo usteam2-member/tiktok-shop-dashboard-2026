@@ -23,9 +23,17 @@ export default function DashboardPage() {
   const [endDate, setEndDate] = useState(searchParams.get("end") || "2026-07-31");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
 
+  // 디버깅 로그
+  useEffect(() => {
+    if (data?.daily?.length) {
+      console.log("📊 Data loaded:", data.daily.length, "days");
+      console.log("First date:", data.daily[0]?.dt);
+      console.log("Last date:", data.daily[data.daily.length - 1]?.dt);
+    }
+  }, [data]);
+
   useEffect(() => {
     if (!data) return;
-    // 초기 로드 시에만 설정
     if (searchParams.get("start") === null) {
       setStartDate("2026-01-01");
       setEndDate("2026-07-31");
@@ -46,15 +54,12 @@ export default function DashboardPage() {
     let endD: Date;
 
     if (days === null) {
-      // 전체: 2026년 전체
       startD = new Date("2026-01-01");
       endD = new Date("2026-07-31");
     } else if (days === 1) {
-      // 오늘: 마지막 날짜
       endD = dtToDate(allDates[allDates.length - 1].dt);
       startD = endD;
     } else {
-      // 최근 N일
       endD = dtToDate(allDates[allDates.length - 1].dt);
       startD = new Date(endD);
       startD.setDate(endD.getDate() - days + 1);
@@ -62,6 +67,7 @@ export default function DashboardPage() {
 
     const s = fmt(startD);
     const e = fmt(endD);
+    console.log(`🔍 Filter: ${days} days → ${s} ~ ${e}`);
     setStartDate(s);
     setEndDate(e);
     pushParams(s, e);
@@ -72,12 +78,16 @@ export default function DashboardPage() {
 
   const kpiData = useMemo(() => {
     if (!data) return [];
-    return filterByRange(startDate, endDate, data.daily);
+    const filtered = filterByRange(startDate, endDate, data.daily);
+    console.log(`📈 KPI Data: ${startDate} ~ ${endDate} → ${filtered.length} items`);
+    return filtered;
   }, [data, startDate, endDate]);
 
   const chartData = useMemo(() => {
     if (!data) return [];
-    return filterByRange(startDate, endDate, data.daily);
+    const filtered = filterByRange(startDate, endDate, data.daily);
+    console.log(`📊 Chart Data: ${startDate} ~ ${endDate} → ${filtered.length} items`);
+    return filtered;
   }, [data, startDate, endDate]);
 
   const top10Data = useMemo(() => {
