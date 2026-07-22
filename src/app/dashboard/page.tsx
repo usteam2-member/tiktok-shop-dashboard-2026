@@ -112,6 +112,24 @@ export default function DashboardPage() {
     return filtered;
   }, [data, startDate, endDate]);
 
+  // 📌 커스텀 범위 여부 판단
+  const isCustomRange = useMemo(() => {
+    if (!data?.daily.length || activeQuick !== null) return false;
+    
+    // 첫 날과 마지막 날 확인
+    const firstDt = data.daily[0].dt;
+    const lastDt = data.daily[data.daily.length - 1].dt;
+    const firstDate = dtToDate(firstDt);
+    const lastDate = dtToDate(lastDt);
+    
+    const firstFmt = fmt(firstDate);
+    const lastFmt = fmt(lastDate);
+    
+    // URL의 범위와 데이터 범위가 같으면 기본값, 다르면 커스텀
+    const isDefault = startDate === firstFmt && endDate === lastFmt;
+    return !isDefault;
+  }, [data, startDate, endDate, activeQuick]);
+
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
     if (activeQuick === 1) return data.productTop10ByPeriod["7"];  // 오늘 = 7일 TOP 10
@@ -167,7 +185,7 @@ export default function DashboardPage() {
               🔄 마지막 업데이트: {new Date(data.updatedAt).toLocaleString("ko-KR")} · 전체 {data.daily.length}일치
             </div>
             <KpiRow data={kpiData} />
-            <DailyCharts data={chartData} activeQuick={activeQuick} />
+            <DailyCharts data={chartData} activeQuick={activeQuick} isCustomRange={isCustomRange} />
             <div style={{ gridColumn: "1 / -1" }}>
               <ThisMonthChart
                 data={top10Data}
