@@ -62,12 +62,6 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
   }
 
   // 전체 (activeQuick === null) → 항상 월별 단위 (각 달 데이터 총합)
-  const MONTH_LABEL: Record<string, string> = {
-    "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
-    "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
-    "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
-  };
-
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
     const m = r.dt.slice(0, 4);
@@ -80,7 +74,11 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
 
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
-    labels.push(MONTH_LABEL[m] || m);
+    
+    // YY/MM 형식 (예: "26/01", "26/02")
+    const yy = m.slice(2, 4);
+    const mm = m.slice(4, 6);
+    labels.push(`${yy}/${mm}`);
 
     // 월별 전체 데이터 합계
     const summedRow: DailyRow = {
