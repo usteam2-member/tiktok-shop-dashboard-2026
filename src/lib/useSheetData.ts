@@ -64,16 +64,31 @@ function parseDailyData(rows: string[][]): DailyRow[] {
     
     // 열 인덱스 (0-based):
     // A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, ..., M=12, ..., Q=16, R=17
+    const krw = safeNum(row[7] || "0");  // H열: 매출_계약(KRW)
+    
     result.push({
       dt,
       aff: safeNum(row[4] || "0"),      // E열: affiliate_upload
       smp: safeNum(row[5] || "0"),      // F열: sample_orders
       ord: safeNum(row[6] || "0"),      // G열: orders
-      krw: safeNum(row[7] || "0"),      // H열: 매출_계약(KRW)
+      krw,
       adCost: safeNum(row[12] || "0"),  // M열: GMV ads
       roas: safeNum(row[16] || "0"),    // Q열: ROAS
       unitPriceUsd: safeNum(row[17] || "0"), // R열: 객단가(USD)
     });
+  }
+  
+  // 📌 매출(krw)이 0이 아닌 마지막 행까지만 필터링
+  let lastValidIdx = -1;
+  for (let i = result.length - 1; i >= 0; i--) {
+    if (result[i].krw > 0) {
+      lastValidIdx = i;
+      break;
+    }
+  }
+  
+  if (lastValidIdx >= 0) {
+    return result.slice(0, lastValidIdx + 1);
   }
   
   return result;
@@ -158,6 +173,11 @@ export function useSheetData() {
 
         const dailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "0");
         const daily = parseDailyData(dailyRows);
+
+        console.log("📊 Daily data loaded:", daily.length, "days");
+        if (daily.length > 0) {
+          console.log("First date:", daily[0].dt, "Last date:", daily[daily.length - 1].dt);
+        }
 
         // Product 데이터는 선택적으로 로드
         let products: ProductRow[] = [];
