@@ -19,25 +19,30 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const { data, loading, error } = useSheetData();
 
-  const [startDate, setStartDate] = useState(searchParams.get("start") || "2026-01-01");
-  const [endDate, setEndDate] = useState(searchParams.get("end") || "2026-07-31");
+  const [startDate, setStartDate] = useState(searchParams.get("start") || "");
+  const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
 
-  // 디버깅 로그
+  // 데이터 로드 시 가장 최신 날짜 기준으로 초기화
   useEffect(() => {
-    if (data?.daily?.length) {
-      console.log("📊 Data loaded:", data.daily.length, "days");
-      console.log("First date:", data.daily[0]?.dt);
-      console.log("Last date:", data.daily[data.daily.length - 1]?.dt);
-    }
-  }, [data]);
+    if (!data?.daily.length) return;
+    
+    // 가장 최신 데이터 날짜 (마지막 항목)
+    const lastDt = data.daily[data.daily.length - 1].dt;
+    const latestDate = dtToDate(lastDt);
+    
+    console.log("📅 Latest date:", fmt(latestDate));
 
-  useEffect(() => {
-    if (!data) return;
-    if (searchParams.get("start") === null) {
-      setStartDate("2026-01-01");
-      setEndDate("2026-07-31");
-      router.replace(`/dashboard?start=2026-01-01&end=2026-07-31`, { scroll: false });
+    // 기본값: 전체 기간
+    if (!searchParams.get("start")) {
+      const firstDt = data.daily[0].dt;
+      const firstDate = dtToDate(firstDt);
+      const s = fmt(firstDate);
+      const e = fmt(latestDate);
+      
+      setStartDate(s);
+      setEndDate(e);
+      router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
     }
   }, [data]);
 
@@ -47,20 +52,21 @@ export default function DashboardPage() {
 
   const handleQuick = useCallback((days: number | null) => {
     if (!data?.daily.length) return;
-    setActiveQuick(days);
     
-    const allDates = data.daily;
+    // 가장 최신 날짜 기준으로 계산
+    const lastDt = data.daily[data.daily.length - 1].dt;
+    const endD = dtToDate(lastDt);
     let startD: Date;
-    let endD: Date;
 
     if (days === null) {
-      startD = new Date("2026-01-01");
-      endD = new Date("2026-07-31");
+      // 전체: 첫 날부터 최신 날까지
+      const firstDt = data.daily[0].dt;
+      startD = dtToDate(firstDt);
     } else if (days === 1) {
-      endD = dtToDate(allDates[allDates.length - 1].dt);
+      // 오늘: 최신 날짜
       startD = endD;
     } else {
-      endD = dtToDate(allDates[allDates.length - 1].dt);
+      // 최근 N일: 최신 날짜를 기준으로 N일 전
       startD = new Date(endD);
       startD.setDate(endD.getDate() - days + 1);
     }
@@ -68,8 +74,10 @@ export default function DashboardPage() {
     const s = fmt(startD);
     const e = fmt(endD);
     console.log(`🔍 Filter: ${days} days → ${s} ~ ${e}`);
+    
     setStartDate(s);
     setEndDate(e);
+    setActiveQuick(days);
     pushParams(s, e);
   }, [data, pushParams]);
 
@@ -102,7 +110,7 @@ export default function DashboardPage() {
   const periodLabel = activeQuick === 1 ? "오늘" :
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
-    activeQuick === 90 ? "최근 90일" : "2026년 전체";
+    activeQuick === 90 ? "최근 90일" : "전체";
 
   const productDetails = useMemo(() => {
     if (!data?.products) return [];
