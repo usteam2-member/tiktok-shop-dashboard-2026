@@ -36,10 +36,9 @@ export default function DashboardPage() {
     // 가장 최신 데이터 날짜 (마지막 항목)
     const lastDt = data.daily[data.daily.length - 1].dt;
     const latestDate = dtToDate(lastDt);
-    const firstDt = data.daily[0].dt;
-    const firstDate = dtToDate(firstDt);
     
-    const s = fmt(firstDate);
+    // 📌 전체 탭은 2026-01-01부터 시작
+    const s = "2026-01-01";
     const e = fmt(latestDate);
     
     console.log("📅 Data range:", s, "~", e);
@@ -50,7 +49,7 @@ export default function DashboardPage() {
     const urlEnd = searchParams.get("end");
     
     if (!urlStart || !urlEnd || urlStart < s || urlEnd > e) {
-      console.log("🔄 Resetting URL to data range");
+      console.log("🔄 Resetting URL to 2026-01-01 ~ latest");
       setStartDate(s);
       setEndDate(e);
       setActiveQuick(null);
@@ -74,9 +73,8 @@ export default function DashboardPage() {
     let startD: Date;
 
     if (days === null) {
-      // 전체: 첫 날부터 최신 날까지
-      const firstDt = data.daily[0].dt;
-      startD = dtToDate(firstDt);
+      // 📌 전체: 2026-01-01부터 최신 날까지
+      startD = new Date("2026-01-01");
     } else if (days === 1) {
       // 오늘: 최근 7일 (최신 날짜부터 7일 전)
       startD = subtractDays(endD, 6);  // 7일 데이터
@@ -116,17 +114,13 @@ export default function DashboardPage() {
   const isCustomRange = useMemo(() => {
     if (!data?.daily.length || activeQuick !== null) return false;
     
-    // 첫 날과 마지막 날 확인
-    const firstDt = data.daily[0].dt;
+    // 전체 탭은 2026-01-01부터 마지막 날까지가 기본값
     const lastDt = data.daily[data.daily.length - 1].dt;
-    const firstDate = dtToDate(firstDt);
     const lastDate = dtToDate(lastDt);
-    
-    const firstFmt = fmt(firstDate);
     const lastFmt = fmt(lastDate);
     
-    // URL의 범위와 데이터 범위가 같으면 기본값, 다르면 커스텀
-    const isDefault = startDate === firstFmt && endDate === lastFmt;
+    // 2026-01-01과 lastDate가 기본값
+    const isDefault = startDate === "2026-01-01" && endDate === lastFmt;
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
