@@ -13,53 +13,49 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
-  if (activeQuick === 1 || activeQuick === 7) {
+  // 오늘 / 7일 / 30일 → 1일 단위
+  if (activeQuick === 1 || activeQuick === 7 || activeQuick === 30) {
     return {
       labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
       rows: data,
+      is30Day: activeQuick === 30,
     };
   }
 
-  if (activeQuick === 30) {
-    return {
-      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-      rows: data,
-      is30Day: true,
-    };
-  }
-
+  // 90일 → 3일 단위 (3일 데이터 총합)
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 5) {
-      sampled.push(data[i]);
-      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
+
+    for (let i = 0; i < data.length; i += 3) {
+      const chunk = data.slice(i, i + 3);
+      if (!chunk.length) continue;
+
+      labels.push(chunk[0].dt.slice(2, 4) + "/" + chunk[0].dt.slice(4, 6));
+
+      // 3일 데이터 합계
+      const summedRow: DailyRow = {
+        dt: chunk[0].dt,
+        krw: chunk.reduce((a, r) => a + r.krw, 0),
+        ord: chunk.reduce((a, r) => a + r.ord, 0),
+        smp: chunk.reduce((a, r) => a + r.smp, 0),
+        aff: chunk.reduce((a, r) => a + r.aff, 0),
+        adCost: chunk.reduce((a, r) => a + r.adCost, 0),
+        roas: chunk.reduce((a, r) => a + r.roas, 0) / chunk.length,
+        unitPriceUsd: chunk.reduce((a, r) => a + r.unitPriceUsd, 0) / chunk.length,
+      };
+      sampled.push(summedRow);
     }
+
     return { labels, rows: sampled };
   }
 
+  // 전체 → 월별 단위 (각 달 데이터 총합)
   const MONTH_LABEL: Record<string, string> = {
     "2601":"1월","2602":"2월","2603":"3월","2604":"4월",
     "2605":"5월","2606":"6월","2607":"7월","2608":"8월",
     "2609":"9월","2610":"10월","2611":"11월","2612":"12월",
   };
-
-  if (data.length <= 14) {
-    return {
-      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
-      rows: data,
-    };
-  }
-  
-  if (data.length <= 60) {
-    const sampled: DailyRow[] = [];
-    const labels: string[] = [];
-    for (let i = 0; i < data.length; i += 3) {
-      sampled.push(data[i]);
-      labels.push(data[i].dt.slice(2, 4) + "/" + data[i].dt.slice(4, 6));
-    }
-    return { labels, rows: sampled };
-  }
 
   const monthMap: Record<string, DailyRow[]> = {};
   for (const r of data) {
@@ -70,10 +66,12 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 
   const labels: string[] = [];
   const rows: DailyRow[] = [];
+
   for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
     if (!chunk.length) continue;
     labels.push(MONTH_LABEL[m] || m);
-    
+
+    // 월별 전체 데이터 합계
     const summedRow: DailyRow = {
       dt: m + "01",
       krw: chunk.reduce((sum, r) => sum + r.krw, 0),
@@ -86,16 +84,15 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
     };
     rows.push(summedRow);
   }
+
   return { labels, rows };
 }
 
 function getPeriodLabel(activeQuick: number | null, dataLength: number): string {
-  if (activeQuick === 1) return "오늘 (최근 7일 차트)";
+  if (activeQuick === 1) return "오늘";
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
-  if (activeQuick === 90) return "최근 90일 (5일 간격)";
-  if (dataLength <= 14) return `${dataLength}일 (1일 단위)`;
-  if (dataLength <= 60) return `${dataLength}일 (3일 간격)`;
+  if (activeQuick === 90) return "최근 90일 (3일 단위)";
   return "2026년 (월별)";
 }
 
