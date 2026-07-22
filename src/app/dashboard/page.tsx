@@ -78,8 +78,8 @@ export default function DashboardPage() {
       const firstDt = data.daily[0].dt;
       startD = dtToDate(firstDt);
     } else if (days === 1) {
-      // 오늘: 최신 날짜
-      startD = new Date(endD);
+      // 오늘: 최근 7일 (최신 날짜부터 7일 전)
+      startD = subtractDays(endD, 6);  // 7일 데이터
     } else {
       // 최근 N일: 최신 날짜를 기준으로 N일 전
       startD = subtractDays(endD, days - 1);
@@ -114,14 +114,14 @@ export default function DashboardPage() {
 
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    if (activeQuick === 1) return data.productTop10ByPeriod["1"];
+    if (activeQuick === 1) return data.productTop10ByPeriod["7"];  // 오늘 = 7일 TOP 10
     if (activeQuick === 7) return data.productTop10ByPeriod["7"];
     if (activeQuick === 30) return data.productTop10ByPeriod["30"];
     if (activeQuick === 90) return data.productTop10ByPeriod["90"];
     return data.productTop10ByPeriod["all"];
   }, [data, activeQuick]);
 
-  const periodLabel = activeQuick === 1 ? "오늘" :
+  const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
