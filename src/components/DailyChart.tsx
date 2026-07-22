@@ -8,10 +8,51 @@ Chart.register(...registerables);
 interface Props {
   data: DailyRow[];
   activeQuick: number | null;
-  isCustomRange?: boolean;  // 커스텀 범위 여부
+  isCustomRange?: boolean;
 }
 
-function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange: boolean = false): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
+function groupByMonth(rows: DailyRow[]): { labels: string[]; rows: DailyRow[] } {
+  if (!rows.length) return { labels: [], rows: [] };
+
+  // 월별로 그룹화
+  const monthMap: Record<string, DailyRow[]> = {};
+  
+  for (const r of rows) {
+    const m = r.dt.slice(0, 4);  // "20260101" → "2026"
+    if (!monthMap[m]) monthMap[m] = [];
+    monthMap[m].push(r);
+  }
+
+  const labels: string[] = [];
+  const resultRows: DailyRow[] = [];
+
+  // 월별로 정렬하여 처리
+  for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (!chunk.length) continue;
+
+    // "2026" → "26/01", "26/02" 형식
+    const yy = m.slice(2, 4);
+    const mm = m.slice(4, 6);
+    labels.push(`${yy}/${mm}`);
+
+    // 월별 데이터 합계
+    const summedRow: DailyRow = {
+      dt: m + "01",
+      krw: chunk.reduce((sum, r) => sum + r.krw, 0),
+      ord: chunk.reduce((sum, r) => sum + r.ord, 0),
+      smp: chunk.reduce((sum, r) => sum + r.smp, 0),
+      aff: chunk.reduce((sum, r) => sum + r.aff, 0),
+      adCost: chunk.reduce((sum, r) => sum + r.adCost, 0),
+      roas: chunk.reduce((sum, r) => sum + r.roas, 0) / chunk.length,
+      unitPriceUsd: chunk.reduce((sum, r) => sum + r.unitPriceUsd, 0) / chunk.length,
+    };
+    resultRows.push(summedRow);
+  }
+
+  return { labels, rows: resultRows };
+}
+
+function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
   // 오늘 / 7일 / 30일 → 1일 단위 (MM/DD 형식)
@@ -29,7 +70,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
     };
   }
 
-  // 90일 → 3일 단위 (3일 데이터 총합, MM/DD 형식)
+  // 90일 → 3일 단위
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
@@ -38,13 +79,11 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
       const chunk = data.slice(i, i + 3);
       if (!chunk.length) continue;
 
-      // MM/DD 형식으로 라벨 표시 (첫 번째 날짜)
       const dt = chunk[0].dt;
       const mm = dt.slice(4, 6);
       const dd = dt.slice(6, 8);
       labels.push(`${mm}/${dd}`);
 
-      // 3일 데이터 합계
       const summedRow: DailyRow = {
         dt: chunk[0].dt,
         krw: chunk.reduce((a, r) => a + r.krw, 0),
@@ -61,40 +100,8 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
     return { labels, rows: sampled };
   }
 
-  // 전체 (activeQuick === null) → 항상 월별 단위 (각 달 데이터 총합)
-  const monthMap: Record<string, DailyRow[]> = {};
-  for (const r of data) {
-    const m = r.dt.slice(0, 4);
-    if (!monthMap[m]) monthMap[m] = [];
-    monthMap[m].push(r);
-  }
-
-  const labels: string[] = [];
-  const rows: DailyRow[] = [];
-
-  for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
-    if (!chunk.length) continue;
-    
-    // YY/MM 형식 (예: "26/01", "26/02")
-    const yy = m.slice(2, 4);
-    const mm = m.slice(4, 6);
-    labels.push(`${yy}/${mm}`);
-
-    // 월별 전체 데이터 합계
-    const summedRow: DailyRow = {
-      dt: m + "01",
-      krw: chunk.reduce((sum, r) => sum + r.krw, 0),
-      ord: chunk.reduce((sum, r) => sum + r.ord, 0),
-      smp: chunk.reduce((sum, r) => sum + r.smp, 0),
-      aff: chunk.reduce((sum, r) => sum + r.aff, 0),
-      adCost: chunk.reduce((sum, r) => sum + r.adCost, 0),
-      roas: chunk.reduce((sum, r) => sum + r.roas, 0) / chunk.length,
-      unitPriceUsd: chunk.reduce((sum, r) => sum + r.unitPriceUsd, 0) / chunk.length,
-    };
-    rows.push(summedRow);
-  }
-
-  return { labels, rows };
+  // 전체 (activeQuick === null) → 월별 단위
+  return groupByMonth(data);
 }
 
 function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): string {
@@ -102,18 +109,16 @@ function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): str
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (3일 단위)";
-  
   if (isCustomRange) return "커스텀 기간 (월별)";
   return "2026년 (월별)";
 }
 
-function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
+function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
   title: string;
   labels: string[];
   datasets: any[];
   yLeftCb: (v: number) => string;
   yRightCb?: (v: number) => string;
-  is30Day?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
@@ -141,8 +146,8 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
           x: {
             ticks: { 
               color: "#94a3b8", 
-              font: { size: is30Day ? 8 : 10 }, 
-              maxRotation: is30Day ? 45 : 30,
+              font: { size: 10 }, 
+              maxRotation: 0,
               autoSkip: false,
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
@@ -168,7 +173,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
     return () => { 
       chartRef.current?.destroy(); 
     };
-  }, [labels, datasets, is30Day, yLeftCb, yRightCb]);
+  }, [labels, datasets, yLeftCb, yRightCb]);
 
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
@@ -183,10 +188,10 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
 }
 
 export default function DailyCharts({ data, activeQuick, isCustomRange = false }: Props) {
-  const { labels, rows, is30Day } = sampleData(data, activeQuick, isCustomRange);
+  const { labels, rows } = sampleData(data, activeQuick);
   const periodLabel = getPeriodLabel(activeQuick, isCustomRange);
 
-  console.log(`📊 DailyCharts: activeQuick=${activeQuick}, isCustomRange=${isCustomRange}, dataLength=${data.length}, labelsLength=${labels.length}`);
+  console.log(`📊 DailyCharts: activeQuick=${activeQuick}, dataLength=${data.length}, labelsLength=${labels.length}, rowsLength=${rows.length}`);
 
   if (!labels.length || !rows.length) {
     return (
@@ -215,7 +220,6 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
         labels={labels}
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toLocaleString()}
-        is30Day={is30Day}
         datasets={[
           { label: "매출(KRW)", data: rows.map(r => r.krw), borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "주문수", data: rows.map(r => r.ord), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -226,7 +230,6 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
         labels={labels}
         yLeftCb={(v) => v.toLocaleString()}
         yRightCb={(v) => v.toLocaleString()}
-        is30Day={is30Day}
         datasets={[
           { label: "소재 업로드", data: rows.map(r => r.aff), borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "샘플 출고", data: rows.map(r => r.smp), borderColor: "#ef4444", borderDash: [5, 4], backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -237,7 +240,6 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
         labels={labels}
         yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
         yRightCb={(v) => v.toFixed(0) + "%"}
-        is30Day={is30Day}
         datasets={[
           { label: "광고비(KRW)", data: rows.map(r => r.adCost), borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
           { label: "ROAS", data: rows.map(r => r.roas), borderColor: "#f59e0b", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 3, fill: false, tension: 0.35, yAxisID: "yRight" },
@@ -247,7 +249,6 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
         title={`객단가 USD (${periodLabel})`}
         labels={labels}
         yLeftCb={(v) => "$" + v.toFixed(1)}
-        is30Day={is30Day}
         datasets={[
           { label: "객단가(USD)", data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
         ]}
