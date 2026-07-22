@@ -36,20 +36,28 @@ export default function DashboardPage() {
     // 가장 최신 데이터 날짜 (마지막 항목)
     const lastDt = data.daily[data.daily.length - 1].dt;
     const latestDate = dtToDate(lastDt);
+    const firstDt = data.daily[0].dt;
+    const firstDate = dtToDate(firstDt);
     
-    console.log("📅 Latest date:", fmt(latestDate), "Total days:", data.daily.length);
+    const s = fmt(firstDate);
+    const e = fmt(latestDate);
+    
+    console.log("📅 Data range:", s, "~", e);
+    console.log("📊 Current URL:", searchParams.get("start"), "~", searchParams.get("end"));
 
-    // 기본값: 전체 기간
-    if (!searchParams.get("start")) {
-      const firstDt = data.daily[0].dt;
-      const firstDate = dtToDate(firstDt);
-      const s = fmt(firstDate);
-      const e = fmt(latestDate);
-      
+    // URL의 날짜가 실제 데이터 범위를 벗어나거나 없으면 강제 재설정
+    const urlStart = searchParams.get("start");
+    const urlEnd = searchParams.get("end");
+    
+    if (!urlStart || !urlEnd || urlStart < s || urlEnd > e) {
+      console.log("🔄 Resetting URL to data range");
       setStartDate(s);
       setEndDate(e);
       setActiveQuick(null);
       router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
+    } else {
+      setStartDate(urlStart);
+      setEndDate(urlEnd);
     }
   }, [data]);
 
