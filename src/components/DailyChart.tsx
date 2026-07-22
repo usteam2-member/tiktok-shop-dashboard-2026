@@ -31,7 +31,11 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
       const chunk = data.slice(i, i + 3);
       if (!chunk.length) continue;
 
-      labels.push(chunk[0].dt.slice(2, 4) + "/" + chunk[0].dt.slice(4, 6));
+      // MM/DD 형식으로 라벨 표시 (첫 번째 날짜)
+      const dt = chunk[0].dt;
+      const mm = dt.slice(4, 6);
+      const dd = dt.slice(6, 8);
+      labels.push(`${mm}/${dd}`);
 
       // 3일 데이터 합계
       const summedRow: DailyRow = {
