@@ -13,16 +13,22 @@ interface Props {
 function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
-  // 오늘 / 7일 / 30일 → 1일 단위
+  // 오늘 / 7일 / 30일 → 1일 단위 (MM/DD 형식)
   if (activeQuick === 1 || activeQuick === 7 || activeQuick === 30) {
+    const labels = data.map(r => {
+      const mm = r.dt.slice(4, 6);
+      const dd = r.dt.slice(6, 8);
+      return `${mm}/${dd}`;
+    });
+    
     return {
-      labels: data.map(r => r.dt.slice(2, 4) + "/" + r.dt.slice(4, 6)),
+      labels,
       rows: data,
       is30Day: activeQuick === 30,
     };
   }
 
-  // 90일 → 3일 단위 (3일 데이터 총합)
+  // 90일 → 3일 단위 (3일 데이터 총합, MM/DD 형식)
   if (activeQuick === 90) {
     const sampled: DailyRow[] = [];
     const labels: string[] = [];
@@ -93,7 +99,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
 }
 
 function getPeriodLabel(activeQuick: number | null, dataLength: number): string {
-  if (activeQuick === 1) return "오늘";
+  if (activeQuick === 1) return "오늘 (최근 7일 차트)";
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (3일 단위)";
