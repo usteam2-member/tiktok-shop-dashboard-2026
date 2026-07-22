@@ -14,6 +14,12 @@ function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
+function subtractDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setTime(result.getTime() - days * 24 * 60 * 60 * 1000);
+  return result;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,7 +37,7 @@ export default function DashboardPage() {
     const lastDt = data.daily[data.daily.length - 1].dt;
     const latestDate = dtToDate(lastDt);
     
-    console.log("📅 Latest date:", fmt(latestDate));
+    console.log("📅 Latest date:", fmt(latestDate), "Total days:", data.daily.length);
 
     // 기본값: 전체 기간
     if (!searchParams.get("start")) {
@@ -42,6 +48,7 @@ export default function DashboardPage() {
       
       setStartDate(s);
       setEndDate(e);
+      setActiveQuick(null);
       router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
     }
   }, [data]);
@@ -64,11 +71,10 @@ export default function DashboardPage() {
       startD = dtToDate(firstDt);
     } else if (days === 1) {
       // 오늘: 최신 날짜
-      startD = endD;
+      startD = new Date(endD);
     } else {
       // 최근 N일: 최신 날짜를 기준으로 N일 전
-      startD = new Date(endD);
-      startD.setDate(endD.getDate() - days + 1);
+      startD = subtractDays(endD, days - 1);
     }
 
     const s = fmt(startD);
