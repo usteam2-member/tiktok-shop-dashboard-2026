@@ -8,9 +8,10 @@ Chart.register(...registerables);
 interface Props {
   data: DailyRow[];
   activeQuick: number | null;
+  isCustomRange?: boolean;  // 커스텀 범위 여부
 }
 
-function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
+function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange: boolean = false): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
   // 오늘 / 7일 / 30일 → 1일 단위 (MM/DD 형식)
@@ -98,12 +99,14 @@ function sampleData(data: DailyRow[], activeQuick: number | null): { labels: str
   return { labels, rows };
 }
 
-function getPeriodLabel(activeQuick: number | null, dataLength: number): string {
+function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): string {
   if (activeQuick === 1) return "오늘 (최근 7일 차트)";
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (3일 단위)";
-  return "전체 (월별)";
+  
+  if (isCustomRange) return "커스텀 기간 (월별)";
+  return "2026년 (월별)";
 }
 
 function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
@@ -119,7 +122,9 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
 
   useEffect(() => {
     if (!canvasRef.current || !labels.length) return;
+    
     chartRef.current?.destroy();
+    
     chartRef.current = new Chart(canvasRef.current, {
       type: "line",
       data: { labels, datasets },
@@ -129,7 +134,8 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
         interaction: { mode: "index", intersect: false },
         plugins: {
           legend: {
-            display: true, position: "bottom",
+            display: true, 
+            position: "bottom",
             labels: { font: { size: 11 }, color: "#64748b", boxWidth: 20, boxHeight: 2, padding: 14 },
           },
         },
@@ -160,8 +166,11 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
         },
       },
     });
-    return () => { chartRef.current?.destroy(); };
-  }, [labels, datasets, is30Day]);
+    
+    return () => { 
+      chartRef.current?.destroy(); 
+    };
+  }, [labels, datasets, is30Day, yLeftCb, yRightCb]);
 
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
@@ -175,9 +184,11 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb, is30Day }: {
   );
 }
 
-export default function DailyCharts({ data, activeQuick }: Props) {
-  const { labels, rows, is30Day } = sampleData(data, activeQuick);
-  const periodLabel = getPeriodLabel(activeQuick, data.length);
+export default function DailyCharts({ data, activeQuick, isCustomRange = false }: Props) {
+  const { labels, rows, is30Day } = sampleData(data, activeQuick, isCustomRange);
+  const periodLabel = getPeriodLabel(activeQuick, isCustomRange);
+
+  console.log(`📊 DailyCharts: activeQuick=${activeQuick}, isCustomRange=${isCustomRange}, dataLength=${data.length}, labelsLength=${labels.length}`);
 
   if (!labels.length || !rows.length) {
     return (
