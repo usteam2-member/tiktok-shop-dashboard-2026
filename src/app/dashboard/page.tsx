@@ -9,6 +9,7 @@ import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
 import ThisMonthChart from "@/components/ThisMonthChart";
+import ProductSalesChart from "@/components/ProductSalesChart";
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -133,6 +134,16 @@ export default function DashboardPage() {
     return data.productTop10ByPeriod["all"];
   }, [data, activeQuick]);
 
+  // 💡 제품별 매출 데이터 변환 (ProductSalesChart용)
+  const productSalesData = useMemo(() => {
+    if (!data?.products) return [];
+    return data.products.map(p => ({
+      productName: p.name,
+      sales: p.totalRevenue,
+      orders: p.ord7,
+    }));
+  }, [data]);
+
   const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
     activeQuick === 7 ? "최근 7일" :
     activeQuick === 30 ? "최근 30일" :
@@ -185,6 +196,13 @@ export default function DashboardPage() {
                 data={top10Data}
                 periodLabel={periodLabel}
                 productDetails={productDetails}
+              />
+            </div>
+            {/* 📊 제품별 매출 Top 10 차트 추가 */}
+            <div style={{ gridColumn: "1 / -1", marginTop: "20px" }}>
+              <ProductSalesChart 
+                data={productSalesData} 
+                periodLabel={periodLabel}
               />
             </div>
           </>
