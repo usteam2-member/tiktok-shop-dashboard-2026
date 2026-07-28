@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
+import { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries, getProductType, filterByRange } from "./data";
 
 export interface SheetData {
   daily: DailyRow[];
@@ -97,47 +97,53 @@ function parseDailyData(rows: string[][]): DailyRow[] {
 }
 
 function parseProductData(rows: string[][]): ProductRow[] {
-  if (rows.length < 2) return [];
+  if (rows.length < 3) return [];
   
-  const headerRow = rows[0];
-  const revenueColIdx = headerRow.findIndex(h => h.includes("매출액(KRW)"));
-  if (revenueColIdx < 0) return [];
-
+  // Row 1 (index 0): 상품코드들 (D, G, J, M, P, S, V, ... 3열씩)
+  // Row 2 (index 1): 각 상품코드별 헤더 (매출액(KRW), 주문수, 생품출고, ...)
+  // Row 3+ (index 2+): 데이터
+  
+  const headerRow = rows[0]; // 상품코드 행
+  
+  // D열(index 3)부터 시작, 3열씩 반복 (D, G, J, M, P, S, V, ...)
   const products: Record<string, ProductRow> = {};
   
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length <= revenueColIdx) continue;
-
-    const pidCol = row[0]?.trim();
-    if (!pidCol || pidCol.startsWith("합계")) continue;
-
-    const name = row.slice(1, revenueColIdx).filter(c => c.trim()).join(" ").trim();
-    const sku = row[1]?.trim() || "";
-    const revenue = safeNum(row[revenueColIdx] || "0");
+  // 상품코드 추출 (D, G, J, M, P, S, V, ... 위치)
+  for (let colIdx = 3; colIdx < headerRow.length; colIdx += 3) {
+    const sku = headerRow[colIdx]?.trim();
+    if (!sku || sku === "") continue;
     
-    if (!name || !pidCol) continue;
-
-    const key = `${pidCol}-${name}`;
-    if (!products[key]) {
-      products[key] = {
-        name,
-        pid: pidCol,
-        sku,
-        productType: getProductType(sku),
-        totalRevenue: revenue,
-        ordToday: 0,
-        ord7: 0,
-        ord30: 0,
-        ordThisMonth: 0,
-        smpThisMonth: 0,
-        newSojae: 0,
-        revSojae: 0,
-        dailySeries: [],
-      };
-    } else {
-      products[key].totalRevenue += revenue;
+    // 이 상품코드의 매출액 열 인덱스는 colIdx (매출액(KRW)가 첫 번째)
+    const revenueColIdx = colIdx;
+    
+    // Row 3부터 (index 2부터) 데이터 합산
+    let totalRevenue = 0;
+    for (let i = 2; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length <= revenueColIdx) continue;
+      totalRevenue += safeNum(row[revenueColIdx] || "0");
     }
+    
+    if (totalRevenue === 0) continue; // 매출이 0이면 스킵
+    
+    const productType = getProductType(sku);
+    const displayName = `${sku} ${productType}`.trim();
+    
+    products[sku] = {
+      name: displayName,
+      pid: sku,
+      sku,
+      productType,
+      totalRevenue,
+      ordToday: 0,
+      ord7: 0,
+      ord30: 0,
+      ordThisMonth: 0,
+      smpThisMonth: 0,
+      newSojae: 0,
+      revSojae: 0,
+      dailySeries: [],
+    };
   }
 
   return Object.values(products).sort((a, b) => b.totalRevenue - a.totalRevenue);
