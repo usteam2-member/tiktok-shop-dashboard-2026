@@ -12,7 +12,7 @@ const QUICK = [
   { label: "7일", days: 7 },
   { label: "30일", days: 30 },
   { label: "90일", days: 90 },
-  { label: "전체", days: null },
+  { label: "설정", days: null },
 ];
 export default function FilterBar({
   startDate, endDate, activeQuick,
