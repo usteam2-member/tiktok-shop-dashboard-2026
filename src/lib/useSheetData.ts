@@ -97,13 +97,15 @@ function parseDailyData(rows: string[][]): DailyRow[] {
 }
 
 function parseProductData(rows: string[][]): ProductRow[] {
-  if (rows.length < 3) return [];
+  if (rows.length < 5) return [];
   
   // Row 1 (index 0): 상품코드들 (D, G, J, M, P, S, V, ... 3열씩)
   // Row 2 (index 1): 각 상품코드별 헤더 (매출액(KRW), 주문수, 생품출고, ...)
-  // Row 3+ (index 2+): 데이터
+  // Row 4 (index 3): 제품명들
+  // Row 5+ (index 4+): 데이터
   
   const headerRow = rows[0]; // 상품코드 행
+  const productNameRow = rows[3]; // 제품명 행 (Row 4)
   
   // D열(index 3)부터 시작, 3열씩 반복 (D, G, J, M, P, S, V, ...)
   const products: Record<string, ProductRow> = {};
@@ -113,12 +115,15 @@ function parseProductData(rows: string[][]): ProductRow[] {
     const sku = headerRow[colIdx]?.trim();
     if (!sku || sku === "") continue;
     
+    // 같은 열에서 제품명 가져오기 (Row 4)
+    const productName = productNameRow[colIdx]?.trim() || sku;
+    
     // 이 상품코드의 매출액 열 인덱스는 colIdx (매출액(KRW)가 첫 번째)
     const revenueColIdx = colIdx;
     
-    // Row 3부터 (index 2부터) 데이터 합산
+    // Row 5부터 (index 4부터) 데이터 합산
     let totalRevenue = 0;
-    for (let i = 2; i < rows.length; i++) {
+    for (let i = 4; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length <= revenueColIdx) continue;
       totalRevenue += safeNum(row[revenueColIdx] || "0");
@@ -127,7 +132,7 @@ function parseProductData(rows: string[][]): ProductRow[] {
     if (totalRevenue === 0) continue; // 매출이 0이면 스킵
     
     const productType = getProductType(sku);
-    const displayName = `${sku} ${productType}`.trim();
+    const displayName = `${productName} ${productType}`.trim();
     
     products[sku] = {
       name: displayName,
