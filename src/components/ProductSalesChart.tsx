@@ -58,6 +58,7 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
             callbacks: {
               label: (context) => {
                 const val = context.parsed.x;
+                if (val === null || val === undefined) return "";
                 if (val >= 1e6) return (val / 1e6).toFixed(1) + "M";
                 if (val >= 1e3) return (val / 1e3).toFixed(0) + "K";
                 return val.toFixed(0);
