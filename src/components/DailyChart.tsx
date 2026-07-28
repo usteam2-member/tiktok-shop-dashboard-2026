@@ -52,11 +52,12 @@ function groupByMonth(rows: DailyRow[]): { labels: string[]; rows: DailyRow[] } 
   return { labels, rows: resultRows };
 }
 
-function sampleData(data: DailyRow[], activeQuick: number | null): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
+function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange: boolean): { labels: string[]; rows: DailyRow[]; is30Day?: boolean } {
   if (!data.length) return { labels: [], rows: [] };
 
   // 오늘 / 7일 / 30일 → 1일 단위 (MM/DD 형식)
-  if (activeQuick === 1 || activeQuick === 7 || activeQuick === 30) {
+  // 또는 커스텀 범위도 1일 단위로 표시
+  if (activeQuick === 1 || activeQuick === 7 || activeQuick === 30 || isCustomRange) {
     const labels = data.map(r => {
       const mm = r.dt.slice(4, 6);
       const dd = r.dt.slice(6, 8);
@@ -109,7 +110,7 @@ function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): str
   if (activeQuick === 7) return "최근 7일 (1일 단위)";
   if (activeQuick === 30) return "최근 30일 (1일 단위)";
   if (activeQuick === 90) return "최근 90일 (3일 단위)";
-  if (isCustomRange) return "커스텀 기간 (월별)";
+  if (isCustomRange) return "커스텀 기간 (1일 단위)";
   return "2026년 (월별)";
 }
 
@@ -194,7 +195,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 }
 
 export default function DailyCharts({ data, activeQuick, isCustomRange = false }: Props) {
-  const { labels, rows } = sampleData(data, activeQuick);
+  const { labels, rows } = sampleData(data, activeQuick, isCustomRange);
   const periodLabel = getPeriodLabel(activeQuick, isCustomRange);
 
   console.log(`📊 DailyCharts: activeQuick=${activeQuick}, dataLength=${data.length}, labelsLength=${labels.length}, rowsLength=${rows.length}`);
