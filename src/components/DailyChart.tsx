@@ -113,6 +113,12 @@ function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): str
   return "2026년 (월별)";
 }
 
+function formatKRW(v: number): string {
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
+  return v.toFixed(0);
+}
+
 function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
   title: string;
   labels: string[];
@@ -218,7 +224,7 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
       <LineChart
         title={`매출 & 주문수 (${periodLabel})`}
         labels={labels}
-        yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
+        yLeftCb={(v) => formatKRW(v)}
         yRightCb={(v) => v.toLocaleString()}
         datasets={[
           { label: "매출(KRW)", data: rows.map(r => r.krw), borderColor: "#3b82f6", backgroundColor: "rgba(59,130,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
@@ -238,7 +244,7 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
       <LineChart
         title={`광고비 & ROAS (${periodLabel})`}
         labels={labels}
-        yLeftCb={(v) => (v / 1e6).toFixed(0) + "M"}
+        yLeftCb={(v) => formatKRW(v)}
         yRightCb={(v) => v.toFixed(0) + "%"}
         datasets={[
           { label: "광고비(KRW)", data: rows.map(r => r.adCost), borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
