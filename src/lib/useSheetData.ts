@@ -4,7 +4,7 @@ import { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries, g
 export interface SheetData {
   daily: DailyRow[];
   products: ProductRow[];
-  productTop10ByPeriod: Record<string, ProductTop10Item[]>;
+  productTop10ByPeriod: Record<string, { revenue: ProductTop10Item[]; orders: ProductTop10Item[] }>;
   sojae: SojaeRow[];
   updatedAt: string;
 }
@@ -289,8 +289,8 @@ export function useSheetData() {
         
         const productDaily = parseProductDailyData();
 
-        // 제품별 TOP 10 (기간별)
-        const generateTop10 = (days: number | null): ProductTop10Item[] => {
+        // 제품별 TOP 10 (기간별, 매출액 기준)
+        const generateTop10ByRevenue = (days: number | null): ProductTop10Item[] => {
           const entries = Object.entries(productDaily);
           if (entries.length === 0) return [];
           
@@ -323,16 +323,54 @@ export function useSheetData() {
               revenue: data[revenueKey],
               orders: data[ordersKey],
             }))
-            .sort((a, b) => b.revenue - a.revenue)
+            .sort((a, b) => b.revenue - a.revenue) // 매출액 기준 정렬
+            .slice(0, 10);
+        };
+
+        // 제품별 TOP 10 (기간별, 주문수 기준)
+        const generateTop10ByOrders = (days: number | null): ProductTop10Item[] => {
+          const entries = Object.entries(productDaily);
+          if (entries.length === 0) return [];
+          
+          let revenueKey: keyof typeof productDaily[string];
+          let ordersKey: keyof typeof productDaily[string];
+          
+          if (days === 1) {
+            revenueKey = "revenue1";
+            ordersKey = "orders1";
+          } else if (days === 7) {
+            revenueKey = "revenue7";
+            ordersKey = "orders7";
+          } else if (days === 30) {
+            revenueKey = "revenue30";
+            ordersKey = "orders30";
+          } else if (days === 90) {
+            revenueKey = "revenue90";
+            ordersKey = "orders90";
+          } else {
+            revenueKey = "revenueAll";
+            ordersKey = "ordersAll";
+          }
+          
+          return entries
+            .map(([sku, data]) => ({
+              name: data.name,
+              pid: sku,
+              sku,
+              productType: getProductType(sku),
+              revenue: data[revenueKey],
+              orders: data[ordersKey],
+            }))
+            .sort((a, b) => b.orders - a.orders) // 주문수 기준 정렬
             .slice(0, 10);
         };
 
         const productTop10ByPeriod = {
-          "1": generateTop10(1),
-          "7": generateTop10(7),
-          "30": generateTop10(30),
-          "90": generateTop10(90),
-          "all": generateTop10(null),
+          "1": { revenue: generateTop10ByRevenue(1), orders: generateTop10ByOrders(1) },
+          "7": { revenue: generateTop10ByRevenue(7), orders: generateTop10ByOrders(7) },
+          "30": { revenue: generateTop10ByRevenue(30), orders: generateTop10ByOrders(30) },
+          "90": { revenue: generateTop10ByRevenue(90), orders: generateTop10ByOrders(90) },
+          "all": { revenue: generateTop10ByRevenue(null), orders: generateTop10ByOrders(null) },
         };
 
         setData({
