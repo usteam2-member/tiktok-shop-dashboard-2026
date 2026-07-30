@@ -141,7 +141,7 @@ export default function DashboardPage() {
     return top10Data.map(p => ({
       productName: p.name,
       sales: p.revenue,
-      orders: 0,
+      orders: (p as any).orders || 0,
     }));
   }, [top10Data]);
 
