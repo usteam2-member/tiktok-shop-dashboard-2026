@@ -6,7 +6,7 @@ interface Props {
   periodLabel: string;
   productDetails?: {
     name: string;
-    pid: string;
+    : string;
     smpThisMonth: number;
     newSojae: number;
     revSojae: number;
@@ -37,7 +37,7 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
             <tr style={{ borderBottom: "1px solid var(--border)", background: "#f8fafc" }}>
               <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500, width: 28 }}>#</th>
               <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>제품명</th>
-              <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>PID</th>
+              <th style={{ textAlign: "left", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>ERP 품번</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>주문수</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>샘플 출고</th>
               <th style={{ textAlign: "right", padding: "8px 10px", color: "var(--muted)", fontWeight: 500 }}>신규 소재</th>
@@ -58,7 +58,7 @@ export default function ThisMonthChart({ data, periodLabel, productDetails }: Pr
                     {p.name}
                   </td>
                   <td style={{ padding: "10px 10px", color: "#94a3b8", fontSize: "11px" }}>
-                    {detail?.pid || p.pid || "-"}
+                    {detail?. || p. || "-"}
                   </td>
                   <td style={{ padding: "10px 10px", textAlign: "right", color: "#3b82f6", fontWeight: 600 }}>
                     {p.revenue.toLocaleString()}
