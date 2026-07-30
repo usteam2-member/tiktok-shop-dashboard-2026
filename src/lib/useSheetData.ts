@@ -227,7 +227,7 @@ export function useSheetData() {
           const codeRow = productDailyRows[2];
           const nameRow = productDailyRows[3];
           
-          const productDaily: Record<string, { name: string; revenue1: number; revenue7: number; revenue30: number; revenue90: number; revenueAll: number }> = {};
+          const productDaily: Record<string, { name: string; revenue1: number; revenue7: number; revenue30: number; revenue90: number; revenueAll: number; orders1: number; orders7: number; orders30: number; orders90: number; ordersAll: number }> = {};
           
           // D, G, J, M 등 3열씩 추출
           for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
@@ -239,8 +239,10 @@ export function useSheetData() {
             const displayName = `${name} ${productType}`.trim();
             
             const revenueColIdx = colIdx; // 매출액(KRW) 열
+            const ordersColIdx = colIdx + 1; // 주문수 열 (매출액 다음)
             
             let rev1 = 0, rev7 = 0, rev30 = 0, rev90 = 0, revAll = 0;
+            let ord1 = 0, ord7 = 0, ord30 = 0, ord90 = 0, ordAll = 0;
             
             // Row 6부터 (index 5부터) 데이터
             for (let i = 5; i < productDailyRows.length; i++) {
@@ -248,14 +250,29 @@ export function useSheetData() {
               if (!row || row.length <= revenueColIdx) continue;
               
               const revenue = safeNum(row[revenueColIdx] || "0");
+              const orders = safeNum(row[ordersColIdx] || "0");
+              
               revAll += revenue;
+              ordAll += orders;
               
               // 마지막 1일, 7일, 30일, 90일 계산 (역순)
               const daysFromEnd = productDailyRows.length - i - 1;
-              if (daysFromEnd === 0) rev1 += revenue;
-              if (daysFromEnd < 7) rev7 += revenue;
-              if (daysFromEnd < 30) rev30 += revenue;
-              if (daysFromEnd < 90) rev90 += revenue;
+              if (daysFromEnd === 0) {
+                rev1 += revenue;
+                ord1 += orders;
+              }
+              if (daysFromEnd < 7) {
+                rev7 += revenue;
+                ord7 += orders;
+              }
+              if (daysFromEnd < 30) {
+                rev30 += revenue;
+                ord30 += orders;
+              }
+              if (daysFromEnd < 90) {
+                rev90 += revenue;
+                ord90 += orders;
+              }
             }
             
             productDaily[sku] = {
@@ -265,6 +282,11 @@ export function useSheetData() {
               revenue30: rev30,
               revenue90: rev90,
               revenueAll: revAll,
+              orders1: ord1,
+              orders7: ord7,
+              orders30: ord30,
+              orders90: ord90,
+              ordersAll: ordAll,
             };
           }
           
@@ -278,12 +300,25 @@ export function useSheetData() {
           const entries = Object.entries(productDaily);
           if (entries.length === 0) return [];
           
-          let sortKey: keyof typeof productDaily[string];
-          if (days === 1) sortKey = "revenue1";
-          else if (days === 7) sortKey = "revenue7";
-          else if (days === 30) sortKey = "revenue30";
-          else if (days === 90) sortKey = "revenue90";
-          else sortKey = "revenueAll";
+          let revenueKey: keyof typeof productDaily[string];
+          let ordersKey: keyof typeof productDaily[string];
+          
+          if (days === 1) {
+            revenueKey = "revenue1";
+            ordersKey = "orders1";
+          } else if (days === 7) {
+            revenueKey = "revenue7";
+            ordersKey = "orders7";
+          } else if (days === 30) {
+            revenueKey = "revenue30";
+            ordersKey = "orders30";
+          } else if (days === 90) {
+            revenueKey = "revenue90";
+            ordersKey = "orders90";
+          } else {
+            revenueKey = "revenueAll";
+            ordersKey = "ordersAll";
+          }
           
           return entries
             .map(([sku, data]) => ({
@@ -291,7 +326,8 @@ export function useSheetData() {
               pid: sku,
               sku,
               productType: getProductType(sku),
-              revenue: data[sortKey],
+              revenue: data[revenueKey],
+              orders: data[ordersKey],
             }))
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 10);
