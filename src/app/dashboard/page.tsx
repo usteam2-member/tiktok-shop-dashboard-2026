@@ -136,14 +136,14 @@ export default function DashboardPage() {
   }, [data, activeQuick]);
 
   // 💡 제품별 매출 데이터 변환 (ProductSalesChart용)
+  // top10Data를 기반으로 기간별 Top 10 제품만 표시
   const productSalesData = useMemo(() => {
-    if (!data?.products) return [];
-    return data.products.map(p => ({
+    return top10Data.map(p => ({
       productName: p.name,
-      sales: p.totalRevenue,
-      orders: p.ord7,
+      sales: p.revenue,
+      orders: 0,
     }));
-  }, [data]);
+  }, [top10Data]);
 
   const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
     activeQuick === 7 ? "최근 7일" :
