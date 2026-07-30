@@ -128,7 +128,7 @@ export default function DashboardPage() {
 
   const top10Data = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    if (activeQuick === 1) return data.productTop10ByPeriod["7"];  // 오늘 = 7일 TOP 10
+    if (activeQuick === 1) return data.productTop10ByPeriod["1"];
     if (activeQuick === 7) return data.productTop10ByPeriod["7"];
     if (activeQuick === 30) return data.productTop10ByPeriod["30"];
     if (activeQuick === 90) return data.productTop10ByPeriod["90"];
