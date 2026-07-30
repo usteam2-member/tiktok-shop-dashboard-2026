@@ -154,8 +154,10 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
             ticks: { 
               color: "#94a3b8", 
               font: { size: 10 }, 
-              maxRotation: 0,
-              autoSkip: false,
+              maxRotation: 45,
+              minRotation: 45,
+              autoSkip: true,
+              maxTicksLimit: 15,
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
