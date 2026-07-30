@@ -207,18 +207,94 @@ export function useSheetData() {
           sojae = [];
         }
 
-        // 제품별 TOP 10
+        // 제품별 일일 매출 데이터 로드
+        let productDailyRows: string[][] = [];
+        try {
+          productDailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
+        } catch (err) {
+          console.warn("Product daily sheet loading failed");
+        }
+
+        // 제품별 일일 매출 데이터 파싱
+        const parseProductDailyData = () => {
+          if (productDailyRows.length < 6) return {};
+          
+          // Row 3 (index 2): 상품코드 (D, G, J, M 등 3열씩)
+          // Row 4 (index 3): 제품명
+          // Row 5 (index 4): 헤더
+          // Row 6+ (index 5+): 일일 데이터
+          
+          const codeRow = productDailyRows[2];
+          const nameRow = productDailyRows[3];
+          
+          const productDaily: Record<string, { name: string; revenue1: number; revenue7: number; revenue30: number; revenue90: number; revenueAll: number }> = {};
+          
+          // D, G, J, M 등 3열씩 추출
+          for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
+            const sku = codeRow[colIdx]?.trim();
+            if (!sku || sku === "") continue;
+            
+            const name = nameRow[colIdx]?.trim() || sku;
+            const productType = getProductType(sku);
+            const displayName = `${name} ${productType}`.trim();
+            
+            const revenueColIdx = colIdx; // 매출액(KRW) 열
+            
+            let rev1 = 0, rev7 = 0, rev30 = 0, rev90 = 0, revAll = 0;
+            
+            // Row 6부터 (index 5부터) 데이터
+            for (let i = 5; i < productDailyRows.length; i++) {
+              const row = productDailyRows[i];
+              if (!row || row.length <= revenueColIdx) continue;
+              
+              const revenue = safeNum(row[revenueColIdx] || "0");
+              revAll += revenue;
+              
+              // 마지막 1일, 7일, 30일, 90일 계산 (역순)
+              const daysFromEnd = productDailyRows.length - i - 1;
+              if (daysFromEnd === 0) rev1 += revenue;
+              if (daysFromEnd < 7) rev7 += revenue;
+              if (daysFromEnd < 30) rev30 += revenue;
+              if (daysFromEnd < 90) rev90 += revenue;
+            }
+            
+            productDaily[sku] = {
+              name: displayName,
+              revenue1: rev1,
+              revenue7: rev7,
+              revenue30: rev30,
+              revenue90: rev90,
+              revenueAll: revAll,
+            };
+          }
+          
+          return productDaily;
+        };
+        
+        const productDaily = parseProductDailyData();
+
+        // 제품별 TOP 10 (기간별)
         const generateTop10 = (days: number | null): ProductTop10Item[] => {
-          return products
-            .slice(0, 10)
-            .map(p => ({
-              name: p.name,
-              pid: p.pid,
-              sku: p.sku,
-              productType: p.productType,
-              revenue: p.totalRevenue,
+          const entries = Object.entries(productDaily);
+          if (entries.length === 0) return [];
+          
+          let sortKey: keyof typeof productDaily[string];
+          if (days === 1) sortKey = "revenue1";
+          else if (days === 7) sortKey = "revenue7";
+          else if (days === 30) sortKey = "revenue30";
+          else if (days === 90) sortKey = "revenue90";
+          else sortKey = "revenueAll";
+          
+          return entries
+            .map(([sku, data]) => ({
+              name: data.name,
+              pid: sku,
+              sku,
+              productType: getProductType(sku),
+              revenue: data[sortKey],
             }))
-            .sort((a, b) => b.revenue - a.revenue);
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 10);
         };
 
         const productTop10ByPeriod = {
