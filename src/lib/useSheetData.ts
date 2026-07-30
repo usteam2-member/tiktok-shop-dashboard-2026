@@ -252,6 +252,13 @@ export function useSheetData() {
               const revenue = safeNum(row[revenueColIdx] || "0");
               const orders = safeNum(row[ordersColIdx] || "0");
               
+              // 디버깅 로그 (첫 행만 출력)
+              if (i === 5 && colIdx === 3) {
+                console.log(`📊 First product (SKU: ${sku}): revenue=${revenue}, orders=${orders}`);
+                console.log(`  revenueColIdx=${revenueColIdx}, ordersColIdx=${ordersColIdx}`);
+                console.log(`  row[${revenueColIdx}]=${row[revenueColIdx]}, row[${ordersColIdx}]=${row[ordersColIdx]}`);
+              }
+              
               revAll += revenue;
               ordAll += orders;
               
