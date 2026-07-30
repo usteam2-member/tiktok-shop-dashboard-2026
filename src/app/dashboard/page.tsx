@@ -38,8 +38,9 @@ export default function DashboardPage() {
     const lastDt = data.daily[data.daily.length - 1].dt;
     const latestDate = dtToDate(lastDt);
     
-    // 📌 전체 탭은 2026-01-01부터 시작
-    const s = "2026-01-01";
+    // 📌 기본값: 30일 탭
+    const startD = subtractDays(latestDate, 29); // 30일 (29일 전 + 오늘)
+    const s = fmt(startD);
     const e = fmt(latestDate);
     
     console.log("📅 Data range:", s, "~", e);
@@ -49,11 +50,11 @@ export default function DashboardPage() {
     const urlStart = searchParams.get("start");
     const urlEnd = searchParams.get("end");
     
-    if (!urlStart || !urlEnd || urlStart < s || urlEnd > e) {
-      console.log("🔄 Resetting URL to 2026-01-01 ~ latest");
+    if (!urlStart || !urlEnd) {
+      console.log("🔄 Resetting URL to 30-day default");
       setStartDate(s);
       setEndDate(e);
-      setActiveQuick(null);
+      setActiveQuick(30);
       router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
     } else {
       setStartDate(urlStart);
