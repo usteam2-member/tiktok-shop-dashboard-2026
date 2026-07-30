@@ -126,24 +126,28 @@ export default function DashboardPage() {
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
-  const top10Data = useMemo(() => {
+  // 📊 기간별 Top 10 (매출액 기준)
+  const top10ByRevenue = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    if (activeQuick === 1) return data.productTop10ByPeriod["1"];
-    if (activeQuick === 7) return data.productTop10ByPeriod["7"];
-    if (activeQuick === 30) return data.productTop10ByPeriod["30"];
-    if (activeQuick === 90) return data.productTop10ByPeriod["90"];
-    return data.productTop10ByPeriod["all"];
+    const key = activeQuick === 1 ? "1" : activeQuick === 7 ? "7" : activeQuick === 30 ? "30" : activeQuick === 90 ? "90" : "all";
+    return data.productTop10ByPeriod[key]?.revenue || [];
   }, [data, activeQuick]);
 
-  // 💡 제품별 매출 데이터 변환 (ProductSalesChart용)
-  // top10Data를 기반으로 기간별 Top 10 제품만 표시
+  // 📊 기간별 Top 10 (주문수 기준)
+  const top10ByOrders = useMemo(() => {
+    if (!data?.productTop10ByPeriod) return [];
+    const key = activeQuick === 1 ? "1" : activeQuick === 7 ? "7" : activeQuick === 30 ? "30" : activeQuick === 90 ? "90" : "all";
+    return data.productTop10ByPeriod[key]?.orders || [];
+  }, [data, activeQuick]);
+
+  // 💡 제품별 매출 데이터 변환 (ProductSalesChart용 - 매출액 기준 Top 10)
   const productSalesData = useMemo(() => {
-    return top10Data.map(p => ({
+    return top10ByRevenue.map(p => ({
       productName: p.name,
       sales: p.revenue,
       orders: (p as any).orders || 0,
     }));
-  }, [top10Data]);
+  }, [top10ByRevenue]);
 
   const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
     activeQuick === 7 ? "최근 7일" :
@@ -192,19 +196,112 @@ export default function DashboardPage() {
             </div>
             <KpiRow data={kpiData} />
             <DailyCharts data={chartData} activeQuick={activeQuick} isCustomRange={isCustomRange} />
+            
+            {/* 📊 매출액 기준 Top 10 제품 테이블 */}
             <div style={{ gridColumn: "1 / -1" }}>
-              <ThisMonthChart
-                data={top10Data}
-                periodLabel={periodLabel}
-                productDetails={productDetails}
-              />
+              <div
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  padding: "20px",
+                  marginBottom: "20px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                }}
+              >
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)", marginBottom: "16px" }}>
+                  매출액 Top 10 제품 ({periodLabel})
+                </div>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "12px",
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid var(--border)", background: "#f9fafb" }}>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>#</th>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>제품명</th>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>ERP 품번</th>
+                      <th style={{ padding: "12px", textAlign: "right", color: "#666", fontWeight: 600 }}>매출액</th>
+                      <th style={{ padding: "12px", textAlign: "right", color: "#666", fontWeight: 600 }}>주문수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top10ByRevenue.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "12px", color: "#666" }}>{idx + 1}</td>
+                        <td style={{ padding: "12px", color: "var(--text)", fontWeight: 500 }}>{item.name}</td>
+                        <td style={{ padding: "12px", color: "#3b82f6" }}>{item.sku}</td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--text)", fontWeight: 500 }}>
+                          {(item.revenue / 1e6).toFixed(1)}M
+                        </td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--text)", fontWeight: 500 }}>
+                          {(item as any).orders || 0}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            {/* 📊 제품별 매출 Top 10 차트 추가 */}
+
+            {/* 📊 매출액 Top 10 제품 막대 그래프 */}
             <div style={{ gridColumn: "1 / -1", marginTop: "20px" }}>
               <ProductSalesChart 
                 data={productSalesData} 
                 periodLabel={periodLabel}
               />
+            </div>
+
+            {/* 📊 주문수 기준 Top 10 제품 테이블 */}
+            <div style={{ gridColumn: "1 / -1", marginTop: "20px" }}>
+              <div
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "8px",
+                  padding: "20px",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                }}
+              >
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)", marginBottom: "16px" }}>
+                  주문수 Top 10 제품 ({periodLabel})
+                </div>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "12px",
+                  }}
+                >
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid var(--border)", background: "#f9fafb" }}>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>#</th>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>제품명</th>
+                      <th style={{ padding: "12px", textAlign: "left", color: "#666", fontWeight: 600 }}>ERP 품번</th>
+                      <th style={{ padding: "12px", textAlign: "right", color: "#666", fontWeight: 600 }}>주문수</th>
+                      <th style={{ padding: "12px", textAlign: "right", color: "#666", fontWeight: 600 }}>매출액</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {top10ByOrders.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "12px", color: "#666" }}>{idx + 1}</td>
+                        <td style={{ padding: "12px", color: "var(--text)", fontWeight: 500 }}>{item.name}</td>
+                        <td style={{ padding: "12px", color: "#3b82f6" }}>{item.sku}</td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--text)", fontWeight: 500 }}>
+                          {(item as any).orders || 0}
+                        </td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--text)", fontWeight: 500 }}>
+                          {(item.revenue / 1e6).toFixed(1)}M
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}
