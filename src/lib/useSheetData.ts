@@ -226,41 +226,47 @@ export function useSheetData() {
             let rev1 = 0, rev7 = 0, rev30 = 0, rev90 = 0, revAll = 0;
             let ord1 = 0, ord7 = 0, ord30 = 0, ord90 = 0, ordAll = 0;
             
-            // Row 6부터 (index 5부터) 데이터
+            // Row 6부터 (index 5부터) 데이터 - 역순으로 순회하면서 실제 데이터만 카운트
             const rows = productDailyRows.slice(5);
             
-            for (let i = 0; i < rows.length; i++) {
+            let dataCount = 0; // 실제 데이터 행 개수
+            
+            for (let i = rows.length - 1; i >= 0; i--) {
               const row = rows[i];
               if (!row || row.length <= revenueColIdx) continue;
               
               const revenue = safeNum(row[revenueColIdx] || "0");
               const orders = safeNum(row[ordersColIdx] || "0");
               
+              // 두 값이 모두 0이면 데이터가 없는 행 - 스킵
+              if (revenue === 0 && orders === 0) continue;
+              
               revAll += revenue;
               ordAll += orders;
               
-              const daysFromEnd = rows.length - i - 1;
+              dataCount++;
               
-              if (daysFromEnd === 0) {
+              // 역순으로 세기: 가장 뒤의 데이터가 가장 최근
+              if (dataCount === 1) {
                 rev1 += revenue;
                 ord1 += orders;
               }
-              if (daysFromEnd < 7) {
+              if (dataCount <= 7) {
                 rev7 += revenue;
                 ord7 += orders;
               }
-              if (daysFromEnd < 30) {
+              if (dataCount <= 30) {
                 rev30 += revenue;
                 ord30 += orders;
               }
-              if (daysFromEnd < 90) {
+              if (dataCount <= 90) {
                 rev90 += revenue;
                 ord90 += orders;
               }
             }
             
             if (colIdx === 3) {
-              console.log(`📊 Product ${sku}: totalRows=${rows.length}, rev1=${rev1}, ord1=${ord1}, rev30=${rev30}, ord30=${ord30}, rev90=${rev90}, ord90=${ord90}`);
+              console.log(`📊 Product ${sku}: actualDataRows=${dataCount}, rev1=${rev1}, ord1=${ord1}, rev7=${rev7}, ord7=${ord7}, rev30=${rev30}, ord30=${ord30}, rev90=${rev90}, ord90=${ord90}`);
             }
             
             productDaily[sku] = {
