@@ -47,22 +47,8 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
             borderColor: "#3b82f6",
             borderWidth: 0,
             borderRadius: 4,
-            yAxisID: "yLeft",
+            yAxisID: "y",
             order: 2,
-          },
-          {
-            label: "주문수",
-            data: ordersData,
-            borderColor: "#f59e0b",
-            backgroundColor: "transparent",
-            borderWidth: 2.5,
-            borderDash: [0],
-            pointRadius: 4,
-            pointBackgroundColor: "#f59e0b",
-            type: "line",
-            yAxisID: "yRight",
-            order: 1,
-            tension: 0.3,
           },
         ],
       },
@@ -89,13 +75,9 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
                 const val = context.parsed.x;
                 if (val === null || val === undefined) return "";
                 
-                if (context.dataset.yAxisID === "yLeft") {
-                  if (val >= 1e6) return "매출액: " + (val / 1e6).toFixed(1) + "M";
-                  if (val >= 1e3) return "매출액: " + (val / 1e3).toFixed(0) + "K";
-                  return "매출액: " + val.toFixed(0);
-                } else {
-                  return "주문수: " + val.toLocaleString();
-                }
+                if (val >= 1e6) return "매출액: " + (val / 1e6).toFixed(1) + "M";
+                if (val >= 1e3) return "매출액: " + (val / 1e3).toFixed(0) + "K";
+                return "매출액: " + val.toFixed(0);
               },
               afterLabel: (context) => {
                 const productName = productNames[context.dataIndex];
@@ -119,17 +101,11 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
-          yLeft: {
+          y: {
             position: "left",
             beginAtZero: true,
-            title: {
-              display: true,
-              text: "매출액(KRW)",
-              color: "#3b82f6",
-              font: { size: 11, weight: "bold" },
-            },
             ticks: {
-              color: "#3b82f6",
+              color: "#64748b",
               font: { size: 10 },
               callback: (v) => {
                 const val = v as number;
@@ -139,22 +115,6 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
               },
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
-          },
-          yRight: {
-            position: "right",
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "주문수",
-              color: "#f59e0b",
-              font: { size: 11, weight: "bold" },
-            },
-            ticks: {
-              color: "#f59e0b",
-              font: { size: 10 },
-              callback: (v) => v.toLocaleString(),
-            },
-            grid: { display: false },
           },
         },
       },
@@ -200,7 +160,7 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
     >
       <div style={{ marginBottom: "12px" }}>
         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>
-          매출액 & 주문수 Top 10 제품 ({periodLabel})
+          매출액 Top 10 제품 ({periodLabel})
         </div>
       </div>
       <div style={{ position: "relative", height: 350 }}>
