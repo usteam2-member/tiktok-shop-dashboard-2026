@@ -100,7 +100,7 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
             beginAtZero: true,
             ticks: {
               color: "#64748b",
-              font: { size: 11, weight: "500" },
+              font: { size: 11 },
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
