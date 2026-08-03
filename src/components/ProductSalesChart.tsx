@@ -100,13 +100,7 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
             beginAtZero: true,
             ticks: {
               color: "#64748b",
-              font: { size: 10 },
-              callback: (v) => {
-                const val = v as number;
-                if (val >= 1e6) return (val / 1e6).toFixed(0) + "M";
-                if (val >= 1e3) return (val / 1e3).toFixed(0) + "K";
-                return val.toFixed(0);
-              },
+              font: { size: 11, weight: "500" },
             },
             grid: { color: "#e2e6ea", lineWidth: 0.5 },
           },
