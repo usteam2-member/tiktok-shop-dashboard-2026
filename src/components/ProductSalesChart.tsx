@@ -24,16 +24,14 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
 
     chartRef.current?.destroy();
 
-    // Top 10 정렬 및 역순 (아래가 1위)
+    // Top 10 정렬 및 순서 (큰 것이 위로)
     const top10 = [...data]
       .sort((a, b) => b.sales - a.sales)
-      .slice(0, 10)
-      .reverse();
+      .slice(0, 10);
 
-    const labels = top10.map((_, i) => `${10 - i}위`);
+    const labels = top10.map(p => p.productName); // 제품명으로 Y축 라벨 설정
     const salesData = top10.map(p => p.sales);
     const ordersData = top10.map(p => p.orders || 0);
-    const productNames = top10.map(p => p.productName);
 
     chartRef.current = new Chart(canvasRef.current, {
       type: "bar",
@@ -78,10 +76,6 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
                 if (val >= 1e6) return "매출액: " + (val / 1e6).toFixed(1) + "M";
                 if (val >= 1e3) return "매출액: " + (val / 1e3).toFixed(0) + "K";
                 return "매출액: " + val.toFixed(0);
-              },
-              afterLabel: (context) => {
-                const productName = productNames[context.dataIndex];
-                return productName;
               },
             },
           },
