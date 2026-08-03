@@ -8,7 +8,6 @@ interface FilterBarProps {
   onQuick: (days: number | null) => void;
 }
 const QUICK = [
-  { label: "오늘", days: 1 },
   { label: "7일", days: 7 },
   { label: "30일", days: 30 },
   { label: "90일", days: 90 },
