@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
-  const [anomalyThreshold, setAnomalyThreshold] = useState<number>(20);
+  const [anomalyThreshold, setAnomalyThreshold] = useState<number>(10);
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState<string>("");
 
   useEffect(() => {
@@ -145,6 +145,15 @@ export default function DashboardPage() {
     return data.daily.map(d => d.dt).reverse(); // 최신부터 오래된 순
   }, [data]);
 
+  // 📊 선택된 날짜의 이상감지 데이터
+  const selectedDateAnomalies = useMemo(() => {
+    if (!data?.anomaliesByDate) return { increases: [], decreases: [] };
+    
+    // selectedAnomalyDate가 비어있으면 최신 데이터
+    const dateKey = selectedAnomalyDate || (availableDates[0] || "");
+    return data.anomaliesByDate[dateKey] || { increases: [], decreases: [] };
+  }, [data, selectedAnomalyDate, availableDates]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Navbar startDate={startDate} endDate={endDate} />
@@ -246,8 +255,8 @@ export default function DashboardPage() {
           )}
           {data && !loading && (
             <AnomalyDetection 
-              increases={data?.anomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || []} 
-              decreases={data?.anomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
+              increases={selectedDateAnomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || []} 
+              decreases={selectedDateAnomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
               threshold={anomalyThreshold}
               onThresholdChange={setAnomalyThreshold}
               selectedDate={selectedAnomalyDate}
