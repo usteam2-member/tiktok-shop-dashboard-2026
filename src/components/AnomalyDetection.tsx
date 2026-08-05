@@ -64,7 +64,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               color: "#1f2937",
             }}
           >
-            <option value="">최신 데이터 (어제 vs 오늘)</option>
+            <option value="">최신 데이터 ({availableDates[0] || ""})</option>
             {availableDates.map((date) => (
               <option key={date} value={date}>
                 {date}
@@ -89,7 +89,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📈 전일 대비 {threshold}% 이상 증가
+            📈 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {threshold}% 이상 증가
             <span
               style={{
                 background: "#059669",
@@ -181,7 +181,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📉 전일 대비 {threshold}% 이상 감소
+            📉 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {threshold}% 이상 감소
             <span
               style={{
                 background: "#dc2626",
