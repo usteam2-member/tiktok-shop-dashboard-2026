@@ -21,11 +21,13 @@ interface Props {
 
 export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange, selectedDate, onDateChange, availableDates }: Props) {
   console.log("📊 [AnomalyDetection] Received:", {
-    increasesCount: increases.length,
-    decreasesCount: decreases.length,
+    increasesCount: increases?.length || 0,
+    increases: increases?.map((d) => `${d.name}: +${d.changePercent.toFixed(1)}%`).slice(0, 3),
+    decreasesCount: decreases?.length || 0,
+    decreases: decreases?.map((d) => `${d.name}: ${d.changePercent.toFixed(1)}%`).slice(0, 3),
     threshold,
     selectedDate,
-    availableDatesCount: availableDates.length,
+    availableDatesCount: availableDates?.length || 0,
   });
 
   return (
