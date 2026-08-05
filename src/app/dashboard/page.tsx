@@ -10,7 +10,7 @@ import AnomalyDetection from "@/components/AnomalyDetection";
 export default function DashboardPage() {
   const { data, loading, error } = useSheetData();
   const [activeQuick, setActiveQuick] = useState<number | null>(30);
-  const [activeCustomDate, setActiveCustomDate] = useState<[string, string] | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
   const today = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState<string>(
     new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
