@@ -11,39 +11,34 @@ export default function DashboardPage() {
   const { data, loading, error } = useSheetData();
   const [activeQuick, setActiveQuick] = useState<number>(30);
   const [activeCustomDate, setActiveCustomDate] = useState<[string, string] | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
+  const today = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState<string>(
+    new Date(new Date().getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
+  const [endDate, setEndDate] = useState<string>(today);
 
-  const isCustomRange = activeCustomDate !== null;
+  const handleQuickChange = (days: number | null) => {
+    if (days === null) {
+      // 설정 탭 - 커스텀 날짜 사용
+      setActiveQuick(null);
+      return;
+    }
+    
+    setActiveQuick(days);
+    const start = new Date(new Date().getTime() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    setStartDate(start);
+    setEndDate(today);
+  };
 
-  const selectedRange = useMemo(() => {
-    if (activeCustomDate) return { start: activeCustomDate[0], end: activeCustomDate[1] };
-    
-    const today = new Date();
-    const ranges: Record<number, { start: string; end: string }> = {
-      7: {
-        start: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end: today.toISOString().split('T')[0],
-      },
-      30: {
-        start: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end: today.toISOString().split('T')[0],
-      },
-      90: {
-        start: new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        end: today.toISOString().split('T')[0],
-      },
-    };
-    
-    return ranges[activeQuick] || { start: "", end: "" };
-  }, [activeQuick, activeCustomDate]);
+  const isCustomRange = activeQuick === null;
 
   const chartData = useMemo(() => {
     if (!data?.daily) return [];
     return data.daily.filter((row) => {
       const dt = row.dt;
-      return dt >= selectedRange.start && dt <= selectedRange.end;
+      return dt >= startDate && dt <= endDate;
     });
-  }, [data, selectedRange]);
+  }, [data, startDate, endDate]);
 
   const kpiData = useMemo(() => {
     if (chartData.length === 0) {
@@ -61,9 +56,9 @@ export default function DashboardPage() {
     if (activeQuick === 7) return "7일";
     if (activeQuick === 30) return "30일";
     if (activeQuick === 90) return "90일";
-    if (activeCustomDate) return `${activeCustomDate[0]} ~ ${activeCustomDate[1]}`;
+    if (activeQuick === null) return `${startDate} ~ ${endDate}`;
     return "전체";
-  }, [activeQuick, activeCustomDate]);
+  }, [activeQuick, startDate, endDate]);
 
   const productSalesData = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
@@ -152,9 +147,12 @@ export default function DashboardPage() {
       {activeTab === "dashboard" && (
         <div>
           <FilterBar 
-            activeQuick={activeQuick} 
-            onQuickChange={setActiveQuick} 
-            onDateRangeChange={setActiveCustomDate} 
+            startDate={startDate}
+            endDate={endDate}
+            activeQuick={activeQuick}
+            onQuick={handleQuickChange}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
           />
           <div
             style={{
