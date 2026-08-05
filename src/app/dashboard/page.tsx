@@ -246,8 +246,8 @@ export default function DashboardPage() {
           )}
           {data && !loading && (
             <AnomalyDetection 
-              increases={data?.anomalies.increases.filter((item) => item.changePercent >= anomalyThreshold) || []} 
-              decreases={data?.anomalies.decreases.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
+              increases={data?.anomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || []} 
+              decreases={data?.anomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
               threshold={anomalyThreshold}
               onThresholdChange={setAnomalyThreshold}
               selectedDate={selectedAnomalyDate}
