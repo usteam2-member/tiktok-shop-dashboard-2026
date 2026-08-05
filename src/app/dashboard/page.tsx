@@ -9,7 +9,7 @@ import AnomalyDetection from "@/components/AnomalyDetection";
 
 export default function DashboardPage() {
   const { data, loading, error } = useSheetData();
-  const [activeQuick, setActiveQuick] = useState<number>(30);
+  const [activeQuick, setActiveQuick] = useState<number | null>(30);
   const [activeCustomDate, setActiveCustomDate] = useState<[string, string] | null>(null);
   const today = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState<string>(
@@ -62,7 +62,12 @@ export default function DashboardPage() {
 
   const productSalesData = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
-    const key = activeQuick === 7 ? "7" : activeQuick === 30 ? "30" : activeQuick === 90 ? "90" : "all";
+    
+    let key: string = "all";
+    if (activeQuick === 7) key = "7";
+    else if (activeQuick === 30) key = "30";
+    else if (activeQuick === 90) key = "90";
+    
     const top10 = data.productTop10ByPeriod[key]?.revenue || [];
     return top10.map(p => ({
       productName: p.name,
