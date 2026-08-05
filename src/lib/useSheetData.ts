@@ -6,6 +6,10 @@ export interface SheetData {
   products: ProductRow[];
   productTop10ByPeriod: Record<string, { revenue: ProductTop10Item[]; orders: ProductTop10Item[] }>;
   sojae: SojaeRow[];
+  anomalies: {
+    increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
+    decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
+  };
   updatedAt: string;
 }
 
@@ -373,11 +377,75 @@ export function useSheetData() {
           "all": { revenue: generateTop10ByRevenue(null), orders: generateTop10ByOrders(null) },
         };
 
+        // 📊 이상감지: 전일 대비 변화율 계산
+        const calculateAnomalies = () => {
+          const rows = productDailyRows.slice(5);
+          if (rows.length < 2) return { increases: [], decreases: [] };
+
+          const todayRowIdx = rows.length - 1;
+          const yesterdayRowIdx = rows.length - 2;
+
+          const todayRow = rows[todayRowIdx];
+          const yesterdayRow = rows[yesterdayRowIdx];
+
+          const increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }> = [];
+          const decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }> = [];
+
+          const codeRow = productDailyRows[2];
+          const nameRow = productDailyRows[3];
+
+          // D, G, J, M 등 3열씩 추출
+          for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
+            const sku = codeRow[colIdx]?.trim();
+            if (!sku || sku === "") continue;
+
+            const name = nameRow[colIdx]?.trim() || sku;
+            const revenueColIdx = colIdx;
+
+            const yesterdayRevenue = parseFloat(yesterdayRow[revenueColIdx] || "0") || 0;
+            const todayRevenue = parseFloat(todayRow[revenueColIdx] || "0") || 0;
+
+            if (yesterdayRevenue === 0) continue;
+
+            const changePercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+
+            const productType = getProductType(sku);
+            const displayName = `${name} ${productType}`.trim();
+
+            if (changePercent >= 20) {
+              increases.push({
+                name: displayName,
+                sku,
+                yesterday: yesterdayRevenue,
+                today: todayRevenue,
+                changePercent,
+              });
+            } else if (changePercent <= -20) {
+              decreases.push({
+                name: displayName,
+                sku,
+                yesterday: yesterdayRevenue,
+                today: todayRevenue,
+                changePercent,
+              });
+            }
+          }
+
+          // 변화율 큰 순서대로 정렬
+          increases.sort((a, b) => b.changePercent - a.changePercent);
+          decreases.sort((a, b) => a.changePercent - b.changePercent); // 내림차순 (감소율 큰 것부터)
+
+          return { increases, decreases };
+        };
+
+        const anomalies = calculateAnomalies();
+
         setData({
           daily,
           products,
           productTop10ByPeriod,
           sojae,
+          anomalies,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {
