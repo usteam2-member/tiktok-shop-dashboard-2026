@@ -20,6 +20,14 @@ interface Props {
 }
 
 export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange, selectedDate, onDateChange, availableDates }: Props) {
+  console.log("📊 [AnomalyDetection] Received:", {
+    increasesCount: increases.length,
+    decreasesCount: decreases.length,
+    threshold,
+    selectedDate,
+    availableDatesCount: availableDates.length,
+  });
+
   return (
     <div>
       {/* 변화율 선택 버튼 + 날짜 선택 */}
