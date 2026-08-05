@@ -12,12 +12,39 @@ interface AnomalyItem {
 interface Props {
   increases: AnomalyItem[];
   decreases: AnomalyItem[];
+  threshold: number;
+  onThresholdChange: (threshold: number) => void;
 }
 
-export default function AnomalyDetection({ increases, decreases }: Props) {
+export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange }: Props) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", padding: "20px" }}>
-      {/* 📈 증가 제품 */}
+    <div>
+      {/* 변화율 선택 버튼 */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "24px", padding: "12px 20px", background: "#f9fafb", borderRadius: "8px" }}>
+        <span style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937", marginRight: "12px" }}>변화율 기준:</span>
+        {[10, 20, 30].map((t) => (
+          <button
+            key={t}
+            onClick={() => onThresholdChange(t)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: "6px",
+              border: "none",
+              background: threshold === t ? "#3b82f6" : "#e5e7eb",
+              color: threshold === t ? "white" : "#1f2937",
+              fontWeight: threshold === t ? 600 : 500,
+              fontSize: "13px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            ±{t}%
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", padding: "20px" }}>
+      {/* 증가 제품 */}
       <div>
         <div
           style={{
@@ -30,7 +57,7 @@ export default function AnomalyDetection({ increases, decreases }: Props) {
             gap: "8px",
           }}
         >
-          📈 전일 대비 20% 이상 증가
+          📈 전일 대비 {threshold}% 이상 증가
           <span
             style={{
               background: "#059669",
@@ -122,7 +149,7 @@ export default function AnomalyDetection({ increases, decreases }: Props) {
             gap: "8px",
           }}
         >
-          📉 전일 대비 20% 이상 감소
+          📉 전일 대비 {threshold}% 이상 감소
           <span
             style={{
               background: "#dc2626",
