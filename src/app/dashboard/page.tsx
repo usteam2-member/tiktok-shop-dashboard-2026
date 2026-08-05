@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
+  const [anomalyThreshold, setAnomalyThreshold] = useState<number>(20);
 
   useEffect(() => {
     if (!data?.daily.length) return;
@@ -238,8 +239,10 @@ export default function DashboardPage() {
           )}
           {data && !loading && (
             <AnomalyDetection 
-              increases={data?.anomalies.increases || []} 
-              decreases={data?.anomalies.decreases || []} 
+              increases={data?.anomalies.increases.filter((item) => item.changePercent >= anomalyThreshold) || []} 
+              decreases={data?.anomalies.decreases.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
+              threshold={anomalyThreshold}
+              onThresholdChange={setAnomalyThreshold}
             />
           )}
         </main>
