@@ -167,7 +167,7 @@ export default function DashboardPage() {
               marginBottom: "24px",
             }}
           >
-            <KpiRow data={kpiData} />
+            <KpiRow data={chartData} />
             <DailyChart data={chartData} activeQuick={activeQuick} isCustomRange={isCustomRange} />
 
             {/* 📊 매출액 기준 Top 10 제품 차트 */}
