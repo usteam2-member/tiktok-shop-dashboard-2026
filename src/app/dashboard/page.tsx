@@ -147,6 +147,8 @@ export default function DashboardPage() {
 
   // 📊 선택된 날짜의 이상감지 데이터
   const selectedDateAnomalies = useMemo(() => {
+    console.log("📊 [Dashboard] data.anomaliesByDate exists:", !!data?.anomaliesByDate);
+    
     if (!data?.anomaliesByDate) {
       console.log("📊 [Dashboard] anomaliesByDate is undefined");
       return { increases: [], decreases: [] };
@@ -154,12 +156,23 @@ export default function DashboardPage() {
     
     // selectedAnomalyDate가 비어있으면 최신 데이터
     const dateKey = selectedAnomalyDate || (availableDates[0] || "");
-    console.log("📊 [Dashboard] selectedDate:", selectedAnomalyDate, "dateKey:", dateKey);
-    console.log("📊 [Dashboard] availableDates:", availableDates);
-    console.log("📊 [Dashboard] anomaliesByDate keys:", Object.keys(data.anomaliesByDate).slice(0, 5));
     
-    const result = data.anomaliesByDate[dateKey] || { increases: [], decreases: [] };
-    console.log("📊 [Dashboard] result for", dateKey, ":", result);
+    console.log("📊 [Dashboard] dateKey:", dateKey);
+    console.log("📊 [Dashboard] availableDates[0]:", availableDates[0]);
+    console.log("📊 [Dashboard] anomaliesByDate keys (first 10):", Object.keys(data.anomaliesByDate).slice(0, 10));
+    console.log("📊 [Dashboard] is dateKey in anomaliesByDate?", dateKey in data.anomaliesByDate);
+    
+    const result = data.anomaliesByDate[dateKey];
+    console.log("📊 [Dashboard] result for key '" + dateKey + "':", result);
+    
+    if (!result) {
+      console.log("📊 [Dashboard] WARNING: No data found for key", dateKey);
+      console.log("📊 [Dashboard] Trying first available date instead...");
+      const firstKey = Object.keys(data.anomaliesByDate)[0];
+      console.log("📊 [Dashboard] First key:", firstKey);
+      console.log("📊 [Dashboard] Data from first key:", data.anomaliesByDate[firstKey]);
+      return data.anomaliesByDate[firstKey] || { increases: [], decreases: [] };
+    }
     
     return result;
   }, [data, selectedAnomalyDate, availableDates]);
