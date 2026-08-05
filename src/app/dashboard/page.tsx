@@ -151,7 +151,11 @@ export default function DashboardPage() {
       {/* 대시보드 탭 */}
       {activeTab === "dashboard" && (
         <div>
-          <FilterBar activeQuick={activeQuick} onQuickSelect={setActiveQuick} onCustomDateSelect={setActiveCustomDate} />
+          <FilterBar 
+            activeQuick={activeQuick} 
+            onQuickChange={setActiveQuick} 
+            onDateRangeChange={setActiveCustomDate} 
+          />
           <div
             style={{
               display: "grid",
