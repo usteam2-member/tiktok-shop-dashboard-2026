@@ -6,7 +6,6 @@ import KpiRow from "@/components/KpiRow";
 import DailyChart from "@/components/DailyChart";
 import ProductSalesChart from "@/components/ProductSalesChart";
 import AnomalyDetection from "@/components/AnomalyDetection";
-import { filterByRange } from "@/lib/data";
 
 export default function DashboardPage() {
   const { data, loading, error } = useSheetData();
@@ -14,8 +13,29 @@ export default function DashboardPage() {
   const [activeCustomDate, setActiveCustomDate] = useState<[string, string] | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
 
-  const isCustomRange = activeQuick === null || activeCustomDate !== null;
-  const selectedRange = activeCustomDate || filterByRange[activeQuick] || { start: "", end: "" };
+  const isCustomRange = activeCustomDate !== null;
+
+  const selectedRange = useMemo(() => {
+    if (activeCustomDate) return { start: activeCustomDate[0], end: activeCustomDate[1] };
+    
+    const today = new Date();
+    const ranges: Record<number, { start: string; end: string }> = {
+      7: {
+        start: new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0],
+      },
+      30: {
+        start: new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0],
+      },
+      90: {
+        start: new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        end: today.toISOString().split('T')[0],
+      },
+    };
+    
+    return ranges[activeQuick] || { start: "", end: "" };
+  }, [activeQuick, activeCustomDate]);
 
   const chartData = useMemo(() => {
     if (!data?.daily) return [];
