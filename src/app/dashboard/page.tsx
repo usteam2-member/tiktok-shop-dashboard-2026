@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
   const [anomalyThreshold, setAnomalyThreshold] = useState<number>(20);
+  const [selectedAnomalyDate, setSelectedAnomalyDate] = useState<string>("");
 
   useEffect(() => {
     if (!data?.daily.length) return;
@@ -138,6 +139,12 @@ export default function DashboardPage() {
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
 
+  // 📊 이상감지용 available dates 계산
+  const availableDates = useMemo(() => {
+    if (!data?.daily) return [];
+    return data.daily.map(d => d.dt).reverse(); // 최신부터 오래된 순
+  }, [data]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Navbar startDate={startDate} endDate={endDate} />
@@ -243,6 +250,9 @@ export default function DashboardPage() {
               decreases={data?.anomalies.decreases.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
               threshold={anomalyThreshold}
               onThresholdChange={setAnomalyThreshold}
+              selectedDate={selectedAnomalyDate}
+              onDateChange={setSelectedAnomalyDate}
+              availableDates={availableDates}
             />
           )}
         </main>
