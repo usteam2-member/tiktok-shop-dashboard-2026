@@ -8,7 +8,6 @@ import TabBar from "@/components/TabBar";
 import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
-import ThisMonthChart from "@/components/ThisMonthChart";
 import ProductSalesChart from "@/components/ProductSalesChart";
 import AnomalyDetection from "@/components/AnomalyDetection";
 
@@ -32,70 +31,67 @@ export default function DashboardPage() {
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
 
-  // 데이터 로드 시 가장 최신 날짜 기준으로 초기화
   useEffect(() => {
     if (!data?.daily.length) return;
     
-    // 가장 최신 데이터 날짜 (마지막 항목)
     const lastDt = data.daily[data.daily.length - 1].dt;
     const latestDate = dtToDate(lastDt);
     
-    // 📌 기본값: 30일 탭
-    const startD = subtractDays(latestDate, 29); // 30일 (29일 전 + 오늘)
+    const startD = subtractDays(latestDate, 29);
     const s = fmt(startD);
     const e = fmt(latestDate);
     
     console.log("📅 Data range:", s, "~", e);
     console.log("📊 Current URL:", searchParams.get("start"), "~", searchParams.get("end"));
 
-    // URL의 날짜가 실제 데이터 범위를 벗어나거나 없으면 강제 재설정
     const urlStart = searchParams.get("start");
     const urlEnd = searchParams.get("end");
     
     if (!urlStart || !urlEnd) {
-      console.log("🔄 Resetting URL to 30-day default");
       setStartDate(s);
       setEndDate(e);
       setActiveQuick(30);
-      router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
+    } else if (urlStart < s || urlEnd > e) {
+      console.log("⚠️  URL dates out of range, resetting to default");
+      setStartDate(s);
+      setEndDate(e);
+      setActiveQuick(30);
     } else {
       setStartDate(urlStart);
       setEndDate(urlEnd);
     }
-  }, [data]);
+  }, [data?.daily]);
 
   const pushParams = useCallback((s: string, e: string) => {
-    router.replace(`/dashboard?start=${s}&end=${e}`, { scroll: false });
+    const p = new URLSearchParams();
+    p.set("start", s);
+    p.set("end", e);
+    router.push(`/dashboard?${p.toString()}`);
   }, [router]);
 
-  const handleQuick = useCallback((days: number | null) => {
+  const handleQuick = (days: number | null) => {
     if (!data?.daily.length) return;
     
-    // 가장 최신 날짜 기준으로 계산
     const lastDt = data.daily[data.daily.length - 1].dt;
-    const endD = dtToDate(lastDt);
-    let startD: Date;
-
-    if (days === null) {
-      // 📌 전체: 2026-01-01부터 최신 날까지
-      startD = new Date("2026-01-01");
-    } else if (days === 1) {
-      // 오늘: 최근 7일 (최신 날짜부터 7일 전)
-      startD = subtractDays(endD, 6);  // 7일 데이터
-    } else {
-      // 최근 N일: 최신 날짜를 기준으로 N일 전
-      startD = subtractDays(endD, days - 1);
-    }
-
-    const s = fmt(startD);
-    const e = fmt(endD);
-    console.log(`🔍 Filter: ${days} days → ${s} ~ ${e}`);
+    const latestDate = dtToDate(lastDt);
     
-    setStartDate(s);
-    setEndDate(e);
-    setActiveQuick(days);
-    pushParams(s, e);
-  }, [data, pushParams]);
+    if (days === null) {
+      // 전체
+      setStartDate("2026-01-01");
+      setEndDate(fmt(latestDate));
+      setActiveQuick(null);
+      pushParams("2026-01-01", fmt(latestDate));
+    } else {
+      const startD = subtractDays(latestDate, days - 1);
+      const s = fmt(startD);
+      const e = fmt(latestDate);
+      
+      setStartDate(s);
+      setEndDate(e);
+      setActiveQuick(days);
+      pushParams(s, e);
+    }
+  };
 
   const handleStart = (v: string) => { setStartDate(v); setActiveQuick(null); pushParams(v, endDate); };
   const handleEnd = (v: string) => { setEndDate(v); setActiveQuick(null); pushParams(startDate, v); };
@@ -114,21 +110,17 @@ export default function DashboardPage() {
     return filtered;
   }, [data, startDate, endDate]);
 
-  // 📌 커스텀 범위 여부 판단
   const isCustomRange = useMemo(() => {
     if (!data?.daily.length || activeQuick !== null) return false;
     
-    // 전체 탭은 2026-01-01부터 마지막 날까지가 기본값
     const lastDt = data.daily[data.daily.length - 1].dt;
     const lastDate = dtToDate(lastDt);
     const lastFmt = fmt(lastDate);
     
-    // 2026-01-01과 lastDate가 기본값
     const isDefault = startDate === "2026-01-01" && endDate === lastFmt;
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
-  // 💡 제품별 매출 데이터 변환 (ProductSalesChart용 - 매출액 기준 Top 10)
   const productSalesData = useMemo(() => {
     if (!data?.productTop10ByPeriod) return [];
     const key = activeQuick === 1 ? "1" : activeQuick === 7 ? "7" : activeQuick === 30 ? "30" : activeQuick === 90 ? "90" : "all";
@@ -145,27 +137,12 @@ export default function DashboardPage() {
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
 
-  const productDetails = useMemo(() => {
-    if (!data?.products) return [];
-    return data.products.map(p => ({
-      name: p.name,
-      pid: p.pid,
-      smpThisMonth: p.smpThisMonth,
-      newSojae: p.newSojae,
-      revSojae: p.revSojae,
-    }));
-  }, [data]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <Navbar startDate={startDate} endDate={endDate} />
-      <TabBar />
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <Navbar startDate={startDate} endDate={endDate} />
       <TabBar />
       
-      {/* 📊 탭 네비게이션 */}
+      {/* 탭 네비게이션 */}
       <div style={{ display: "flex", gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
         <button
           onClick={() => setActiveTab("dashboard")}
