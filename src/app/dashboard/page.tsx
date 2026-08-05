@@ -268,13 +268,13 @@ export default function DashboardPage() {
               {(() => {
                 const filteredIncreases = selectedDateAnomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || [];
                 const filteredDecreases = selectedDateAnomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || [];
-                console.log("📊 [Dashboard] Filtered results:", {
-                  threshold: anomalyThreshold,
-                  originalIncreases: selectedDateAnomalies?.increases?.length || 0,
-                  filteredIncreases: filteredIncreases.length,
-                  originalDecreases: selectedDateAnomalies?.decreases?.length || 0,
-                  filteredDecreases: filteredDecreases.length,
-                });
+                
+                console.log("📊 [Dashboard] selectedDateAnomalies:", selectedDateAnomalies);
+                console.log("📊 [Dashboard] Original increases:", selectedDateAnomalies?.increases?.length || 0);
+                console.log("📊 [Dashboard] Filtered increases (threshold " + anomalyThreshold + "):", filteredIncreases.length);
+                console.log("📊 [Dashboard] Original decreases:", selectedDateAnomalies?.decreases?.length || 0);
+                console.log("📊 [Dashboard] Filtered decreases (threshold " + anomalyThreshold + "):", filteredDecreases.length);
+                
                 return (
                   <AnomalyDetection 
                     increases={filteredIncreases}
