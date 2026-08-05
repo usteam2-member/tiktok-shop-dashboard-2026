@@ -6,10 +6,10 @@ export interface SheetData {
   products: ProductRow[];
   productTop10ByPeriod: Record<string, { revenue: ProductTop10Item[]; orders: ProductTop10Item[] }>;
   sojae: SojaeRow[];
-  anomalies: {
+  anomaliesByDate: Record<string, {
     increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
     decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
-  };
+  }>;
   updatedAt: string;
 }
 
@@ -377,75 +377,82 @@ export function useSheetData() {
           "all": { revenue: generateTop10ByRevenue(null), orders: generateTop10ByOrders(null) },
         };
 
-        // 📊 이상감지: 전일 대비 변화율 계산
-        const calculateAnomalies = () => {
+        // 📊 이상감지: 모든 날짜별 전일 대비 변화율 계산
+        const calculateAnomaliesByDate = () => {
           const rows = productDailyRows.slice(5);
-          if (rows.length < 2) return { increases: [], decreases: [] };
+          if (rows.length < 2) return {};
 
-          const todayRowIdx = rows.length - 1;
-          const yesterdayRowIdx = rows.length - 2;
-
-          const todayRow = rows[todayRowIdx];
-          const yesterdayRow = rows[yesterdayRowIdx];
-
-          const increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }> = [];
-          const decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }> = [];
+          const anomaliesByDate: Record<string, any> = {};
 
           const codeRow = productDailyRows[2];
           const nameRow = productDailyRows[3];
 
-          // D, G, J, M 등 3열씩 추출
-          for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
-            const sku = codeRow[colIdx]?.trim();
-            if (!sku || sku === "") continue;
+          // 모든 인접한 두 행씩 비교 (i = 오늘, i-1 = 어제)
+          for (let i = 1; i < rows.length; i++) {
+            const todayRow = rows[i];
+            const yesterdayRow = rows[i - 1];
+            const todayDt = todayRow[0]?.trim() || "";
 
-            const name = nameRow[colIdx]?.trim() || sku;
-            const revenueColIdx = colIdx;
+            if (!todayDt) continue;
 
-            const yesterdayRevenue = parseFloat(yesterdayRow[revenueColIdx] || "0") || 0;
-            const todayRevenue = parseFloat(todayRow[revenueColIdx] || "0") || 0;
+            const increases: any[] = [];
+            const decreases: any[] = [];
 
-            if (yesterdayRevenue === 0) continue;
+            // D, G, J, M 등 3열씩 추출
+            for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
+              const sku = codeRow[colIdx]?.trim();
+              if (!sku || sku === "") continue;
 
-            const changePercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+              const name = nameRow[colIdx]?.trim() || sku;
+              const revenueColIdx = colIdx;
 
-            const productType = getProductType(sku);
-            const displayName = `${name} ${productType}`.trim();
+              const yesterdayRevenue = parseFloat(yesterdayRow[revenueColIdx] || "0") || 0;
+              const todayRevenue = parseFloat(todayRow[revenueColIdx] || "0") || 0;
 
-            if (changePercent >= 20) {
-              increases.push({
-                name: displayName,
-                sku,
-                yesterday: yesterdayRevenue,
-                today: todayRevenue,
-                changePercent,
-              });
-            } else if (changePercent <= -20) {
-              decreases.push({
-                name: displayName,
-                sku,
-                yesterday: yesterdayRevenue,
-                today: todayRevenue,
-                changePercent,
-              });
+              if (yesterdayRevenue === 0) continue;
+
+              const changePercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+
+              const productType = getProductType(sku);
+              const displayName = `${name} ${productType}`.trim();
+
+              if (changePercent >= 10) {
+                increases.push({
+                  name: displayName,
+                  sku,
+                  yesterday: yesterdayRevenue,
+                  today: todayRevenue,
+                  changePercent,
+                });
+              } else if (changePercent <= -10) {
+                decreases.push({
+                  name: displayName,
+                  sku,
+                  yesterday: yesterdayRevenue,
+                  today: todayRevenue,
+                  changePercent,
+                });
+              }
             }
+
+            // 변화율 큰 순서대로 정렬
+            increases.sort((a, b) => b.changePercent - a.changePercent);
+            decreases.sort((a, b) => a.changePercent - b.changePercent);
+
+            anomaliesByDate[todayDt] = { increases, decreases };
           }
 
-          // 변화율 큰 순서대로 정렬
-          increases.sort((a, b) => b.changePercent - a.changePercent);
-          decreases.sort((a, b) => a.changePercent - b.changePercent); // 내림차순 (감소율 큰 것부터)
-
-          return { increases, decreases };
+          return anomaliesByDate;
         };
 
-        const anomalies = calculateAnomalies();
+        const anomaliesByDate = calculateAnomaliesByDate();
 
         setData({
           daily,
           products,
           productTop10ByPeriod,
           sojae,
-          anomalies,
+          anomaliesByDate,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {
