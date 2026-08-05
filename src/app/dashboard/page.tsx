@@ -147,11 +147,21 @@ export default function DashboardPage() {
 
   // 📊 선택된 날짜의 이상감지 데이터
   const selectedDateAnomalies = useMemo(() => {
-    if (!data?.anomaliesByDate) return { increases: [], decreases: [] };
+    if (!data?.anomaliesByDate) {
+      console.log("📊 [Dashboard] anomaliesByDate is undefined");
+      return { increases: [], decreases: [] };
+    }
     
     // selectedAnomalyDate가 비어있으면 최신 데이터
     const dateKey = selectedAnomalyDate || (availableDates[0] || "");
-    return data.anomaliesByDate[dateKey] || { increases: [], decreases: [] };
+    console.log("📊 [Dashboard] selectedDate:", selectedAnomalyDate, "dateKey:", dateKey);
+    console.log("📊 [Dashboard] availableDates:", availableDates);
+    console.log("📊 [Dashboard] anomaliesByDate keys:", Object.keys(data.anomaliesByDate).slice(0, 5));
+    
+    const result = data.anomaliesByDate[dateKey] || { increases: [], decreases: [] };
+    console.log("📊 [Dashboard] result for", dateKey, ":", result);
+    
+    return result;
   }, [data, selectedAnomalyDate, availableDates]);
 
   return (
