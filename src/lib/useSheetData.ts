@@ -380,28 +380,25 @@ export function useSheetData() {
         // 📊 이상감지: 모든 날짜별 전일 대비 변화율 계산
         const calculateAnomaliesByDate = () => {
           const rows = productDailyRows.slice(5);
-          console.log("📊 [Anomaly] Product daily rows count:", rows.length);
-          
-          if (rows.length < 2) {
-            console.log("📊 [Anomaly] Not enough rows (need at least 2)");
-            return {};
-          }
+          if (rows.length < 2) return {};
 
           const anomaliesByDate: Record<string, any> = {};
 
           const codeRow = productDailyRows[2];
           const nameRow = productDailyRows[3];
 
-          console.log("📊 [Anomaly] Code row:", codeRow?.slice(3, 12));
-          console.log("📊 [Anomaly] Name row:", nameRow?.slice(3, 12));
-
           // 모든 인접한 두 행씩 비교 (i = 오늘, i-1 = 어제)
           for (let i = 1; i < rows.length; i++) {
             const todayRow = rows[i];
             const yesterdayRow = rows[i - 1];
-            const todayDt = todayRow[0]?.trim() || "";
+            let todayDt = todayRow[0]?.trim() || "";
 
             if (!todayDt) continue;
+
+            // todayDt 형식 표준화: "20260804" → "2026-08-04"
+            if (todayDt.length === 8 && !todayDt.includes('-')) {
+              todayDt = `${todayDt.substring(0, 4)}-${todayDt.substring(4, 6)}-${todayDt.substring(6, 8)}`;
+            }
 
             const increases: any[] = [];
             const decreases: any[] = [];
@@ -447,19 +444,14 @@ export function useSheetData() {
             increases.sort((a, b) => b.changePercent - a.changePercent);
             decreases.sort((a, b) => a.changePercent - b.changePercent);
 
-            if (increases.length > 0 || decreases.length > 0) {
-              console.log(`📊 [Anomaly] ${todayDt}: +${increases.length}, -${decreases.length}`);
-            }
-
             anomaliesByDate[todayDt] = { increases, decreases };
           }
 
-          console.log("📊 [Anomaly] Total dates processed:", Object.keys(anomaliesByDate).length);
           return anomaliesByDate;
         };
 
         const anomaliesByDate = calculateAnomaliesByDate();
-        console.log("📊 Anomalies by date:", anomaliesByDate);
+        console.log("📊 Anomalies by date - total dates:", Object.keys(anomaliesByDate).length);
 
         setData({
           daily,
