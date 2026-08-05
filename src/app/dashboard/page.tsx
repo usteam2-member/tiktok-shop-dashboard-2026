@@ -142,37 +142,31 @@ export default function DashboardPage() {
   // 📊 이상감지용 available dates 계산
   const availableDates = useMemo(() => {
     if (!data?.daily) return [];
-    return data.daily.map(d => d.dt).reverse(); // 최신부터 오래된 순
+    return data.daily
+      .map(d => {
+        let dt = d.dt;
+        // "20260804" → "2026-08-04" 형식으로 표준화
+        if (dt.length === 8 && !dt.includes('-')) {
+          dt = `${dt.substring(0, 4)}-${dt.substring(4, 6)}-${dt.substring(6, 8)}`;
+        }
+        return dt;
+      })
+      .reverse(); // 최신부터 오래된 순
   }, [data]);
 
   // 📊 선택된 날짜의 이상감지 데이터
   const selectedDateAnomalies = useMemo(() => {
-    console.log("📊 [Dashboard] data.anomaliesByDate exists:", !!data?.anomaliesByDate);
-    
     if (!data?.anomaliesByDate) {
-      console.log("📊 [Dashboard] anomaliesByDate is undefined");
       return { increases: [], decreases: [] };
     }
     
     // selectedAnomalyDate가 비어있으면 최신 데이터
     const dateKey = selectedAnomalyDate || (availableDates[0] || "");
     
-    console.log("📊 [Dashboard] dateKey:", dateKey);
-    console.log("📊 [Dashboard] availableDates[0]:", availableDates[0]);
-    console.log("📊 [Dashboard] anomaliesByDate keys (first 10):", Object.keys(data.anomaliesByDate).slice(0, 10));
-    console.log("📊 [Dashboard] is dateKey in anomaliesByDate?", dateKey in data.anomaliesByDate);
+    console.log("📊 [Dashboard] dateKey:", dateKey, "availableDates[0]:", availableDates[0]);
     
-    const result = data.anomaliesByDate[dateKey];
-    console.log("📊 [Dashboard] result for key '" + dateKey + "':", result);
-    
-    if (!result) {
-      console.log("📊 [Dashboard] WARNING: No data found for key", dateKey);
-      console.log("📊 [Dashboard] Trying first available date instead...");
-      const firstKey = Object.keys(data.anomaliesByDate)[0];
-      console.log("📊 [Dashboard] First key:", firstKey);
-      console.log("📊 [Dashboard] Data from first key:", data.anomaliesByDate[firstKey]);
-      return data.anomaliesByDate[firstKey] || { increases: [], decreases: [] };
-    }
+    const result = data.anomaliesByDate[dateKey] || { increases: [], decreases: [] };
+    console.log("📊 [Dashboard] Data for", dateKey, ": +", result.increases?.length || 0, " -", result.decreases?.length || 0);
     
     return result;
   }, [data, selectedAnomalyDate, availableDates]);
