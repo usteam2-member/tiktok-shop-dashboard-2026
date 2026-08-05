@@ -264,15 +264,30 @@ export default function DashboardPage() {
             </div>
           )}
           {data && !loading && (
-            <AnomalyDetection 
-              increases={selectedDateAnomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || []} 
-              decreases={selectedDateAnomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || []}
-              threshold={anomalyThreshold}
-              onThresholdChange={setAnomalyThreshold}
-              selectedDate={selectedAnomalyDate}
-              onDateChange={setSelectedAnomalyDate}
-              availableDates={availableDates}
-            />
+            <>
+              {(() => {
+                const filteredIncreases = selectedDateAnomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || [];
+                const filteredDecreases = selectedDateAnomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || [];
+                console.log("📊 [Dashboard] Filtered results:", {
+                  threshold: anomalyThreshold,
+                  originalIncreases: selectedDateAnomalies?.increases?.length || 0,
+                  filteredIncreases: filteredIncreases.length,
+                  originalDecreases: selectedDateAnomalies?.decreases?.length || 0,
+                  filteredDecreases: filteredDecreases.length,
+                });
+                return (
+                  <AnomalyDetection 
+                    increases={filteredIncreases}
+                    decreases={filteredDecreases}
+                    threshold={anomalyThreshold}
+                    onThresholdChange={setAnomalyThreshold}
+                    selectedDate={selectedAnomalyDate}
+                    onDateChange={setSelectedAnomalyDate}
+                    availableDates={availableDates}
+                  />
+                );
+              })()}
+            </>
           )}
         </main>
       )}
