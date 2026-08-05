@@ -14,33 +14,64 @@ interface Props {
   decreases: AnomalyItem[];
   threshold: number;
   onThresholdChange: (threshold: number) => void;
+  selectedDate: string;
+  onDateChange: (date: string) => void;
+  availableDates: string[];
 }
 
-export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange }: Props) {
+export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange, selectedDate, onDateChange, availableDates }: Props) {
   return (
     <div>
-      {/* 변화율 선택 버튼 */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "24px", padding: "12px 20px", background: "#f9fafb", borderRadius: "8px" }}>
-        <span style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937", marginRight: "12px" }}>변화율 기준:</span>
-        {[10, 20, 30].map((t) => (
-          <button
-            key={t}
-            onClick={() => onThresholdChange(t)}
+      {/* 변화율 선택 버튼 + 날짜 선택 */}
+      <div style={{ display: "flex", gap: "20px", marginBottom: "24px", padding: "12px 20px", background: "#f9fafb", borderRadius: "8px", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937", marginRight: "12px" }}>변화율 기준:</span>
+          {[10, 20, 30].map((t) => (
+            <button
+              key={t}
+              onClick={() => onThresholdChange(t)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "6px",
+                border: "none",
+                background: threshold === t ? "#3b82f6" : "#e5e7eb",
+                color: threshold === t ? "white" : "#1f2937",
+                fontWeight: threshold === t ? 600 : 500,
+                fontSize: "13px",
+                cursor: "pointer",
+                transition: "all 0.2s",
+              }}
+            >
+              ±{t}%
+            </button>
+          ))}
+        </div>
+
+        <div style={{ width: "1px", height: "24px", background: "#d1d5db" }} />
+
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <label style={{ fontSize: "14px", fontWeight: 600, color: "#1f2937" }}>기준 날짜:</label>
+          <select
+            value={selectedDate}
+            onChange={(e) => onDateChange(e.target.value)}
             style={{
-              padding: "6px 14px",
+              padding: "6px 12px",
               borderRadius: "6px",
-              border: "none",
-              background: threshold === t ? "#3b82f6" : "#e5e7eb",
-              color: threshold === t ? "white" : "#1f2937",
-              fontWeight: threshold === t ? 600 : 500,
+              border: "1px solid #d1d5db",
               fontSize: "13px",
               cursor: "pointer",
-              transition: "all 0.2s",
+              background: "white",
+              color: "#1f2937",
             }}
           >
-            ±{t}%
-          </button>
-        ))}
+            <option value="">최신 데이터 (어제 vs 오늘)</option>
+            {availableDates.map((date) => (
+              <option key={date} value={date}>
+                {date}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* 증가/감소 제품 그리드 */}
