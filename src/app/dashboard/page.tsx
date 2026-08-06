@@ -139,7 +139,7 @@ export default function DashboardPage() {
     activeQuick === 30 ? "최근 30일" :
     activeQuick === 90 ? "최근 90일" : "전체";
 
-  // 📊 이상감지용 available dates 계산
+  // 📊 이상감지용 available dates 계산 (최근 30일만)
   const availableDates = useMemo(() => {
     if (!data?.daily) return [];
     return data.daily
@@ -151,7 +151,8 @@ export default function DashboardPage() {
         }
         return dt;
       })
-      .reverse(); // 최신부터 오래된 순
+      .reverse() // 최신부터 오래된 순
+      .slice(0, 30); // 최근 30일만
   }, [data]);
 
   // 📊 선택된 날짜의 이상감지 데이터
