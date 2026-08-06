@@ -17,7 +17,13 @@ export default function ProductsPage() {
 
   // 제품 목록 생성
   const allProducts = useMemo(() => {
-    if (!data?.products) return [];
+    if (!data?.products) {
+      console.log("📊 [Products] data.products is undefined or empty");
+      console.log("📊 [Products] data:", data);
+      return [];
+    }
+    
+    console.log("📊 [Products] data.products count:", data.products.length);
     
     return data.products.map(p => {
       const productType = p.sku.startsWith("SB") ? "(단품)" : p.sku.startsWith("BD") ? "(번들)" : "";
