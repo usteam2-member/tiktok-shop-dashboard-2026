@@ -467,10 +467,42 @@ export function useSheetData() {
         });
         console.log("📊 Anomalies by date - total dates:", Object.keys(anomaliesByDate).length);
 
-        // 최종 products 배열 로그
-        console.log("📊 [useSheetData] Parsed products count:", products.length);
+        // 📊 제품 목록 생성 (productDaily 시트의 Row 3, 4에서 추출)
+        console.log("📊 [useSheetData] productDailyRows length:", productDailyRows.length);
+        if (productDailyRows.length > 0) {
+          console.log("📊 [useSheetData] Row 0 (index 0, 처음 5개):", productDailyRows[0]?.slice(0, 5));
+          console.log("📊 [useSheetData] Row 1 (index 1, 처음 5개):", productDailyRows[1]?.slice(0, 5));
+          console.log("📊 [useSheetData] Row 2 (index 2, 처음 5개):", productDailyRows[2]?.slice(0, 5));
+          console.log("📊 [useSheetData] Row 3 (index 3, 처음 5개):", productDailyRows[3]?.slice(0, 5));
+        }
+
+        const products: ProductRow[] = [];
+        if (productDailyRows.length > 3) {
+          const codeRow = productDailyRows[2]; // Row 3 (index 2): SKU
+          const nameRow = productDailyRows[3]; // Row 4 (index 3): 제품명
+
+          console.log("📊 [useSheetData] codeRow length:", codeRow?.length);
+          console.log("📊 [useSheetData] nameRow length:", nameRow?.length);
+
+          // D, G, J, M 등 3열씩 추출
+          for (let colIdx = 3; colIdx < (codeRow?.length || 0); colIdx += 3) {
+            const sku = codeRow[colIdx]?.trim();
+            if (!sku || sku === "") continue;
+
+            const name = nameRow?.[colIdx]?.trim() || sku;
+            
+            console.log(`📊 [useSheetData] Found product at col ${colIdx}: SKU=${sku}, Name=${name}`);
+            
+            products.push({
+              name,
+              sku,
+            });
+          }
+        }
+
+        console.log("📊 [useSheetData] Extracted products count:", products.length);
         if (products.length > 0) {
-          console.log("📊 [useSheetData] Sample product:", products[0]);
+          console.log("📊 [useSheetData] Sample products:", products.slice(0, 3));
         }
 
         setData({
