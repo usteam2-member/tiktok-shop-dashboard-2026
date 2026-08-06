@@ -16,7 +16,7 @@ export default function TabBar({ activeTab }: Props) {
   const pathname = usePathname();
 
   return (
-    <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", background: "var(--card)" }}>
+    <div style={{ display: "flex", borderBottom: "3px solid #e5e7eb", background: "var(--card)", padding: "0" }}>
       {TABS.map((t) => {
         let isActive = false;
         if (activeTab) {
@@ -33,36 +33,33 @@ export default function TabBar({ activeTab }: Props) {
             key={t.label}
             onClick={() => router.push(t.href)}
             style={{
-              padding: "14px 20px",
+              padding: "16px 24px",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "10px",
               cursor: "pointer",
-              fontSize: "14px",
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? "#1f2937" : "#94a3b8",
-              background: isActive ? "#f0f9ff" : "transparent",
-              borderBottom: isActive ? "3px solid #3b82f6" : "none",
+              fontSize: "15px",
+              fontWeight: isActive ? 800 : 500,
+              color: isActive ? "#1f2937" : "#b0b9c3",
+              background: isActive ? "#eff6ff" : "transparent",
+              borderBottom: isActive ? "4px solid #3b82f6" : "none",
               transition: "all 0.3s ease",
-              boxShadow: isActive ? "0 2px 8px rgba(59, 130, 246, 0.1)" : "none",
-              position: "relative",
+              boxShadow: isActive ? "inset 0 -4px 0 #3b82f6, 0 2px 8px rgba(59, 130, 246, 0.2)" : "none",
+              marginBottom: isActive ? "-3px" : "0",
             }}
           >
-            <span style={{ fontSize: "16px" }}>{t.icon}</span>
-            <span>{t.label}</span>
-            {isActive && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "-2px",
-                  left: "0",
-                  right: "0",
-                  height: "3px",
-                  background: "#3b82f6",
-                  borderRadius: "2px 2px 0 0",
-                }}
-              />
-            )}
+            <span style={{ 
+              fontSize: "18px",
+              opacity: isActive ? 1 : 0.6,
+              transition: "all 0.3s ease",
+            }}>
+              {t.icon}
+            </span>
+            <span style={{ 
+              textShadow: isActive ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
+            }}>
+              {t.label}
+            </span>
           </div>
         );
       })}
