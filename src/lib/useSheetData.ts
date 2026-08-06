@@ -404,6 +404,7 @@ export function useSheetData() {
             const decreases: any[] = [];
 
             // D, G, J, M 등 3열씩 추출
+            let increasesCount = 0, decreasesCount = 0;
             for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
               const sku = codeRow[colIdx]?.trim();
               if (!sku || sku === "") continue;
@@ -429,6 +430,7 @@ export function useSheetData() {
                   today: todayRevenue,
                   changePercent,
                 });
+                increasesCount++;
               } else if (changePercent <= -10) {
                 decreases.push({
                   name: displayName,
@@ -437,12 +439,17 @@ export function useSheetData() {
                   today: todayRevenue,
                   changePercent,
                 });
+                decreasesCount++;
               }
             }
 
             // 변화율 큰 순서대로 정렬
             increases.sort((a, b) => b.changePercent - a.changePercent);
             decreases.sort((a, b) => a.changePercent - b.changePercent);
+
+            if (i <= 3) {
+              console.log(`📊 [Calc] Row ${i} (${todayDt}): found +${increasesCount} -${decreasesCount}`);
+            }
 
             anomaliesByDate[todayDt] = { increases, decreases };
           }
@@ -451,7 +458,20 @@ export function useSheetData() {
         };
 
         const anomaliesByDate = calculateAnomaliesByDate();
+        
+        // 로그: 각 날짜별 데이터 개수
+        const sampleDates = Object.keys(anomaliesByDate).slice(0, 5);
+        sampleDates.forEach(date => {
+          const data = anomaliesByDate[date];
+          console.log(`📊 ${date}: +${data.increases?.length || 0}, -${data.decreases?.length || 0}`);
+        });
         console.log("📊 Anomalies by date - total dates:", Object.keys(anomaliesByDate).length);
+
+        // 최종 products 배열 로그
+        console.log("📊 [useSheetData] Parsed products count:", products.length);
+        if (products.length > 0) {
+          console.log("📊 [useSheetData] Sample product:", products[0]);
+        }
 
         setData({
           daily,
