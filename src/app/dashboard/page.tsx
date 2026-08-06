@@ -178,19 +178,21 @@ export default function DashboardPage() {
       <TabBar />
       
       {/* 탭 네비게이션 */}
-      <div style={{ display: "flex", gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
+      <div style={{ display: "flex", gap: "12px", padding: "16px 20px", borderBottom: "2px solid #e5e7eb", background: "var(--card)" }}>
         <button
           onClick={() => setActiveTab("dashboard")}
           style={{
-            padding: "8px 16px",
-            borderRadius: "6px",
+            padding: "10px 18px",
+            borderRadius: "8px",
             border: "none",
-            background: activeTab === "dashboard" ? "#3b82f6" : "transparent",
+            background: activeTab === "dashboard" ? "#3b82f6" : "#f3f4f6",
             color: activeTab === "dashboard" ? "white" : "#64748b",
-            fontWeight: 600,
-            fontSize: "14px",
+            fontWeight: activeTab === "dashboard" ? 700 : 600,
+            fontSize: "15px",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "all 0.3s ease",
+            boxShadow: activeTab === "dashboard" ? "0 2px 8px rgba(59, 130, 246, 0.3)" : "none",
+            transform: activeTab === "dashboard" ? "translateY(-2px)" : "translateY(0)",
           }}
         >
           📊 대시보드
@@ -198,15 +200,17 @@ export default function DashboardPage() {
         <button
           onClick={() => setActiveTab("anomaly")}
           style={{
-            padding: "8px 16px",
-            borderRadius: "6px",
+            padding: "10px 18px",
+            borderRadius: "8px",
             border: "none",
-            background: activeTab === "anomaly" ? "#3b82f6" : "transparent",
+            background: activeTab === "anomaly" ? "#3b82f6" : "#f3f4f6",
             color: activeTab === "anomaly" ? "white" : "#64748b",
-            fontWeight: 600,
-            fontSize: "14px",
+            fontWeight: activeTab === "anomaly" ? 700 : 600,
+            fontSize: "15px",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "all 0.3s ease",
+            boxShadow: activeTab === "anomaly" ? "0 2px 8px rgba(59, 130, 246, 0.3)" : "none",
+            transform: activeTab === "anomaly" ? "translateY(-2px)" : "translateY(0)",
           }}
         >
           ⚠️ 이상감지
