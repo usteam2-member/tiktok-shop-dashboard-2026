@@ -16,7 +16,7 @@ export default function TabBar({ activeTab }: Props) {
   const pathname = usePathname();
 
   return (
-    <div style={{ display: "flex", borderBottom: "1px solid var(--border)", background: "var(--card)" }}>
+    <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", background: "var(--card)" }}>
       {TABS.map((t) => {
         let isActive = false;
         if (activeTab) {
@@ -33,20 +33,36 @@ export default function TabBar({ activeTab }: Props) {
             key={t.label}
             onClick={() => router.push(t.href)}
             style={{
-              padding: "12px 16px",
+              padding: "14px 20px",
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              gap: "8px",
               cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: isActive ? 600 : 400,
-              color: isActive ? "var(--text)" : "var(--muted)",
-              borderBottom: isActive ? "2px solid #3b82f6" : "none",
-              transition: "all 0.2s",
+              fontSize: "14px",
+              fontWeight: isActive ? 700 : 500,
+              color: isActive ? "#1f2937" : "#94a3b8",
+              background: isActive ? "#f0f9ff" : "transparent",
+              borderBottom: isActive ? "3px solid #3b82f6" : "none",
+              transition: "all 0.3s ease",
+              boxShadow: isActive ? "0 2px 8px rgba(59, 130, 246, 0.1)" : "none",
+              position: "relative",
             }}
           >
-            <span>{t.icon}</span>
+            <span style={{ fontSize: "16px" }}>{t.icon}</span>
             <span>{t.label}</span>
+            {isActive && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "-2px",
+                  left: "0",
+                  right: "0",
+                  height: "3px",
+                  background: "#3b82f6",
+                  borderRadius: "2px 2px 0 0",
+                }}
+              />
+            )}
           </div>
         );
       })}
