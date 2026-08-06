@@ -487,16 +487,28 @@ export function useSheetData() {
 
           // D, G, J, M 등 3열씩 추출
           for (let colIdx = 3; colIdx < (codeRow?.length || 0); colIdx += 3) {
-            const sku = codeRow[colIdx]?.trim();
+            const sku = codeRow?.[colIdx]?.trim();
             if (!sku || sku === "") continue;
 
             const name = nameRow?.[colIdx]?.trim() || sku;
+            const productType = getProductType(sku);
             
             console.log(`📊 [useSheetData] Found product at col ${colIdx}: SKU=${sku}, Name=${name}`);
             
             products.push({
               name,
               sku,
+              pid: sku, // SKU를 PID로 사용
+              productType,
+              totalRevenue: 0,
+              ordToday: 0,
+              ord7: 0,
+              ord30: 0,
+              ordThisMonth: 0,
+              smpThisMonth: 0,
+              newSojae: 0,
+              revSojae: 0,
+              dailySeries: [],
             });
           }
         }
