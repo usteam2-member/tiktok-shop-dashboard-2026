@@ -476,7 +476,8 @@ export function useSheetData() {
           console.log("📊 [useSheetData] Row 3 (index 3, 처음 5개):", productDailyRows[3]?.slice(0, 5));
         }
 
-        const products: ProductRow[] = [];
+        // productDailyRows에서 추출한 제품으로 덮어씌우기 (183줄의 let products 재사용)
+        products = []; // 초기화
         if (productDailyRows.length > 3) {
           const codeRow = productDailyRows[2]; // Row 3 (index 2): SKU
           const nameRow = productDailyRows[3]; // Row 4 (index 3): 제품명
