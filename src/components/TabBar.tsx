@@ -39,12 +39,12 @@ export default function TabBar({ activeTab }: Props) {
             key={t.label}
             onClick={() => router.push(t.href)}
             style={{
-              padding: "16px 24px",
+              padding: "10px 20px",
               display: "flex",
               alignItems: "center",
               gap: "10px",
               cursor: "pointer",
-              fontSize: "15px",
+              fontSize: "14px",
               fontWeight: isActive ? 800 : 500,
               color: isActive ? "#1f2937" : "#b0b9c3",
               background: isActive ? "#eff6ff" : "transparent",
