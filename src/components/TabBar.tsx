@@ -19,15 +19,21 @@ export default function TabBar({ activeTab }: Props) {
     <div style={{ display: "flex", borderBottom: "3px solid #e5e7eb", background: "var(--card)", padding: "0" }}>
       {TABS.map((t) => {
         let isActive = false;
+        
         if (activeTab) {
           isActive = activeTab === t.label;
         } else {
-          if (t.href === "/dashboard") {
+          // 더 구체적인 경로부터 확인 (순서 중요!)
+          if (t.href === "/dashboard/products") {
+            isActive = pathname === "/dashboard/products" || pathname.startsWith("/dashboard/products/");
+          } else if (t.href === "/dashboard/kpi-tracking") {
+            isActive = pathname === "/dashboard/kpi-tracking" || pathname.startsWith("/dashboard/kpi-tracking/");
+          } else if (t.href === "/dashboard") {
+            // /dashboard 정확히 (다른 것들과 겹치지 않게)
             isActive = pathname === "/dashboard";
-          } else {
-            isActive = pathname.startsWith(t.href);
           }
         }
+        
         return (
           <div
             key={t.label}
