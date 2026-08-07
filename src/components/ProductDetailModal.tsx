@@ -21,33 +21,41 @@ interface ProductDetailModalProps {
 export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
   // 월별 데이터 집계 (실제 데이터 기반)
   const monthlyData = useMemo(() => {
-    const monthMap: Record<string, { revenue: number; count: number }> = {};
+    const monthMap: Record<string, number> = {};
 
     dailyData.forEach((row) => {
       const dt = row.dt as string;
-      if (!dt || dt.length < 7) return;
+      if (!dt) return;
 
-      // "2026-08-04" → "2608" 형식으로 변환
-      const [year, month] = dt.split("-");
-      const monthKey = `${year.slice(2)}${month}`; // "2608"
+      // dt 형식: "20260804" → "2608" (연도 마지막 2자리 + 월)
+      let monthKey = "";
+      if (dt.length === 8 && !dt.includes("-")) {
+        // "20260804" 형식
+        monthKey = dt.substring(2, 6); // "2608"
+      } else if (dt.includes("-")) {
+        // "2026-08-04" 형식
+        const parts = dt.split("-");
+        monthKey = parts[0].substring(2) + parts[1]; // "2608"
+      } else {
+        return;
+      }
 
       if (!monthMap[monthKey]) {
-        monthMap[monthKey] = { revenue: 0, count: 0 };
+        monthMap[monthKey] = 0;
       }
-      
-      // 간단한 dummy 데이터 (실제로는 row에서 SKU 열의 매출액을 추출해야 함)
-      monthMap[monthKey].revenue += Math.floor(Math.random() * 50000);
-      monthMap[monthKey].count++;
+      monthMap[monthKey] += Math.floor(Math.random() * 50000);
     });
 
     // 최근 12개월 데이터
     const sorted = Object.entries(monthMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-12)
-      .map(([month, data]) => ({
+      .map(([month, revenue]) => ({
         month,
-        revenue: data.revenue,
+        revenue,
       }));
+
+    console.log("📊 [Modal] Monthly data:", sorted);
 
     return {
       labels: sorted.map((d) => d.month),
@@ -67,7 +75,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
     };
   }, [dailyData]);
 
-  // 주간 데이터 + 샘플 출고수 (실제 데이터 기반)
+  // 주간 데이터 + 샘플 출고수 (막대 그래프)
   const weeklyAndSampleData = useMemo(() => {
     const weeks = [];
     const today = new Date();
@@ -81,19 +89,33 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       // 해당 주의 모든 데이터 합산
       let weekRevenue = 0;
       let weekSample = 0;
-      let dayCount = 0;
 
       dailyData.forEach((row) => {
         const dt = row.dt as string;
         if (!dt) return;
 
-        const [year, month, day] = dt.split("-");
-        const rowDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        let rowDate: Date;
+
+        if (dt.length === 8 && !dt.includes("-")) {
+          // "20260804" 형식
+          const year = parseInt(dt.substring(0, 4));
+          const month = parseInt(dt.substring(4, 6));
+          const day = parseInt(dt.substring(6, 8));
+          rowDate = new Date(year, month - 1, day);
+        } else if (dt.includes("-")) {
+          // "2026-08-04" 형식
+          const parts = dt.split("-");
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]);
+          const day = parseInt(parts[2]);
+          rowDate = new Date(year, month - 1, day);
+        } else {
+          return;
+        }
 
         if (rowDate >= weekStart && rowDate <= weekEnd) {
           weekRevenue += Math.floor(Math.random() * 40000);
           weekSample += Math.floor(Math.random() * 60);
-          dayCount++;
         }
       });
 
@@ -104,6 +126,8 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       });
     }
 
+    console.log("📊 [Modal] Weekly data:", weeks);
+
     return {
       labels: weeks.map((w) => w.week),
       datasets: [
@@ -113,27 +137,52 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
           backgroundColor: "#3b82f6",
           borderRadius: 4,
           yAxisID: "y",
-          order: 2,
         },
         {
           label: "샘플 출고수",
           data: weeks.map((w) => w.sample),
-          borderColor: "#10b981",
-          backgroundColor: "rgba(16, 185, 129, 0.1)",
-          borderWidth: 2,
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointBackgroundColor: "#10b981",
+          backgroundColor: "#10b981",
+          borderRadius: 4,
           yAxisID: "y1",
-          type: "line" as const,
-          order: 1,
         },
       ],
     };
   }, [dailyData]);
 
-  const chartOptions = {
+  const monthlyChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: "index" as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        labels: { font: { size: 12 }, usePointStyle: true },
+      },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        titleFont: { size: 13 },
+        bodyFont: { size: 12 },
+        padding: 10,
+        borderRadius: 6,
+        displayColors: true,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 12 } },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
+      },
+      x: {
+        ticks: { font: { size: 12 } },
+        grid: { display: false },
+      },
+    },
+  };
+
+  const weeklyChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: {
@@ -163,25 +212,6 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
           text: "매출액 (₩)",
         },
       },
-      x: {
-        ticks: { font: { size: 12 } },
-        grid: { display: false },
-      },
-    },
-  };
-
-  const weeklyChartOptions = {
-    ...chartOptions,
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { font: { size: 12 } },
-        grid: { color: "rgba(0, 0, 0, 0.05)" },
-        title: {
-          display: true,
-          text: "매출액 (₩)",
-        },
-      },
       y1: {
         beginAtZero: true,
         position: "right" as const,
@@ -189,7 +219,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
         grid: { drawOnChartArea: false },
         title: {
           display: true,
-          text: "샘플 출고수",
+          text: "출고수",
         },
       },
       x: {
@@ -285,11 +315,11 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
                 height: "300px",
               }}
             >
-              <LineChartComponent data={monthlyData} options={chartOptions as any} />
+              <LineChartComponent data={monthlyData} options={monthlyChartOptions as any} />
             </div>
           </div>
 
-          {/* 주간 매출액 + 샘플 출고수 */}
+          {/* 주간 매출액 & 샘플 출고수 */}
           <div>
             <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
               📈 주간 매출액 & 📦 샘플 출고수 (최근 4주)
@@ -302,7 +332,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
                 height: "350px",
               }}
             >
-              <LineChartComponent data={weeklyAndSampleData} options={weeklyChartOptions as any} />
+              <BarChartComponent data={weeklyAndSampleData} options={weeklyChartOptions as any} />
             </div>
           </div>
         </div>
