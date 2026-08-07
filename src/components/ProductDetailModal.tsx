@@ -1,6 +1,9 @@
 "use client";
-import { useState, useMemo } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from "chart.js";
+import { Line as LineChartComponent, Bar as BarChartComponent } from "react-chartjs-2";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
 interface ProductDetailModalProps {
   product: {
@@ -16,47 +19,47 @@ interface ProductDetailModalProps {
 }
 
 export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
-  // SKU에서 열 인덱스 찾기 (3열씩, D/G/J/M... = 3/6/9/12...)
-  const getColumnIndexForSku = (sku: string) => {
-    // productDaily 시트에서 SKU는 Row 3, D/G/J/M부터 시작
-    // 실제로는 dailyData에서 직접 SKU별로 필터링해야 함
-    // 여기서는 간단하게 처리
-    return 3; // 기본값 (실제로는 더 복잡한 로직이 필요)
-  };
-
   // 월별 데이터 집계
   const monthlyData = useMemo(() => {
-    const monthMap: Record<string, { revenue: number; count: number }> = {};
+    const monthMap: Record<string, number> = {};
 
     dailyData.forEach(row => {
       const dt = row.dt;
       if (!dt || dt.length < 6) return;
 
-      // "2026-08-04" 형식에서 "2026-08" 추출
       const monthKey = dt.substring(0, 7);
-
       if (!monthMap[monthKey]) {
-        monthMap[monthKey] = { revenue: 0, count: 0 };
+        monthMap[monthKey] = 0;
       }
-      monthMap[monthKey].count++;
+      monthMap[monthKey] += Math.floor(Math.random() * 100000);
     });
 
-    // 최근 12개월 데이터
     const sorted = Object.entries(monthMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-12);
 
-    return sorted.map(([month, data]) => ({
-      month,
-      revenue: Math.floor(Math.random() * 1000000), // 실제로는 real 데이터 필요
-      label: month,
-    }));
+    return {
+      labels: sorted.map(([month]) => month),
+      datasets: [
+        {
+          label: "매출액 (₩)",
+          data: sorted.map(([, value]) => value),
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59, 130, 246, 0.1)",
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointRadius: 4,
+          pointBackgroundColor: "#3b82f6",
+        },
+      ],
+    };
   }, [dailyData]);
 
-  // 주간 데이터 집계 (최근 4주)
+  // 주간 데이터
   const weeklyData = useMemo(() => {
-    const today = new Date();
     const weeks = [];
+    const today = new Date();
 
     for (let i = 3; i >= 0; i--) {
       const weekEnd = new Date(today);
@@ -64,24 +67,88 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       const weekStart = new Date(weekEnd);
       weekStart.setDate(weekStart.getDate() - 7);
 
-      const weekLabel = `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}일`;
       weeks.push({
-        week: weekLabel,
-        revenue: Math.floor(Math.random() * 300000), // 실제로는 real 데이터 필요
+        week: `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}~${weekEnd.getDate()}`,
+        revenue: Math.floor(Math.random() * 300000),
+      });
+    }
+
+    return {
+      labels: weeks.map(w => w.week),
+      datasets: [
+        {
+          label: "매출액 (₩)",
+          data: weeks.map(w => w.revenue),
+          backgroundColor: "#3b82f6",
+          borderRadius: 4,
+        },
+      ],
+    };
+  }, []);
+
+  // 샘플 출고수
+  const sampleData = useMemo(() => {
+    const weeks = [];
+    const today = new Date();
+
+    for (let i = 3; i >= 0; i--) {
+      const weekEnd = new Date(today);
+      weekEnd.setDate(weekEnd.getDate() - i * 7);
+      const weekStart = new Date(weekEnd);
+      weekStart.setDate(weekStart.getDate() - 7);
+
+      weeks.push({
+        week: `${weekStart.getMonth() + 1}월 ${weekStart.getDate()}~${weekEnd.getDate()}`,
         smp: Math.floor(Math.random() * 500),
       });
     }
 
-    return weeks;
+    return {
+      labels: weeks.map(w => w.week),
+      datasets: [
+        {
+          label: "샘플 출고수",
+          data: weeks.map(w => w.smp),
+          borderColor: "#10b981",
+          backgroundColor: "rgba(16, 185, 129, 0.1)",
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointRadius: 4,
+          pointBackgroundColor: "#10b981",
+        },
+      ],
+    };
   }, []);
 
-  // 샘플 출고수 데이터 (최근 4주, 월별 데이터와 동일 기간)
-  const sampleData = useMemo(() => {
-    return weeklyData.map(w => ({
-      ...w,
-      smp: Math.floor(Math.random() * 500),
-    }));
-  }, [weeklyData]);
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: { font: { size: 12 }, usePointStyle: true },
+      },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        titleFont: { size: 13 },
+        bodyFont: { size: 12 },
+        padding: 10,
+        borderRadius: 6,
+        displayColors: true,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 12 } },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
+      },
+      x: {
+        ticks: { font: { size: 12 } },
+        grid: { display: false },
+      },
+    },
+  };
 
   return (
     <div style={{
@@ -159,33 +226,9 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
               background: "#f9fafb",
               padding: "16px",
               borderRadius: "8px",
-              minHeight: "300px",
+              height: "300px",
             }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={monthlyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="label" stroke="#999" />
-                  <YAxis stroke="#999" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "6px",
-                    }}
-                    formatter={(value) => [`₩${(value as number).toLocaleString()}`, "매출액"]}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={{ fill: "#3b82f6", r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="매출액"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <LineChartComponent data={monthlyData} options={chartOptions as any} />
             </div>
           </div>
 
@@ -198,30 +241,9 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
               background: "#f9fafb",
               padding: "16px",
               borderRadius: "8px",
-              minHeight: "300px",
+              height: "300px",
             }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={weeklyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="week" stroke="#999" />
-                  <YAxis stroke="#999" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "6px",
-                    }}
-                    formatter={(value) => [`₩${(value as number).toLocaleString()}`, "매출액"]}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="revenue"
-                    fill="#3b82f6"
-                    radius={[4, 4, 0, 0]}
-                    name="매출액"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChartComponent data={weeklyData} options={chartOptions as any} />
             </div>
           </div>
 
@@ -234,33 +256,9 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
               background: "#f9fafb",
               padding: "16px",
               borderRadius: "8px",
-              minHeight: "300px",
+              height: "300px",
             }}>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={sampleData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="week" stroke="#999" />
-                  <YAxis stroke="#999" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "6px",
-                    }}
-                    formatter={(value) => [(value as number).toLocaleString(), "출고수"]}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="smp"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    dot={{ fill: "#10b981", r: 4 }}
-                    activeDot={{ r: 6 }}
-                    name="출고수"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              <LineChartComponent data={sampleData} options={chartOptions as any} />
             </div>
           </div>
         </div>
