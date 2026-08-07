@@ -5,55 +5,42 @@ import { Line as LineChartComponent, Bar as BarChartComponent } from "react-char
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
+interface DailyRow {
+  dt: string;
+  krw?: number;
+  smp?: number;
+  ord?: number;
+  [key: string]: any;
+}
+
 interface ProductDetailModalProps {
   product: {
     name: string;
     sku: string;
     pid: string;
   };
-  productDailyRows: string[][];
+  dailyData: DailyRow[];
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ product, productDailyRows, onClose }: ProductDetailModalProps) {
-  // SKU의 열 인덱스 찾기
-  const skuColumnIndex = useMemo(() => {
-    console.log(`📊 [Modal] Finding SKU: ${product.sku}`);
-    console.log(`📊 [Modal] productDailyRows length: ${productDailyRows.length}`);
-    
-    if (productDailyRows.length < 3) {
-      console.log("❌ [Modal] Not enough rows");
-      return -1;
-    }
-    
-    const skuRow = productDailyRows[2];
-    const idx = skuRow.findIndex(sku => sku?.trim() === product.sku);
-    console.log(`📊 [Modal] SKU ${product.sku} found at column ${idx}`);
-    
-    // 처음 20개 행의 첫 번째 열 출력 (날짜 찾기)
-    console.log("📊 [Modal] === First column of rows 0-20 ===");
-    for (let i = 0; i < Math.min(20, productDailyRows.length); i++) {
-      const row = productDailyRows[i];
-      const firstCol = row[0]?.trim() || "(empty)";
-      console.log(`  Row ${i}: "${firstCol}"`);
-    }
-    
-    return idx;
-  }, [productDailyRows, product.sku]);
-
-  // 날짜가 유효한지 검증
-  const isValidDate = (dt: string): boolean => {
+export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
+  // 날짜 검증
+  const isValidDate = (dt: any): boolean => {
     if (!dt) return false;
     
-    // "20260804" 또는 "2026-08-04" 형식만 허용
-    if (dt.length === 8 && /^\d{8}$/.test(dt)) {
-      const year = parseInt(dt.substring(0, 4));
-      const month = parseInt(dt.substring(4, 6));
-      const day = parseInt(dt.substring(6, 8));
+    const dtStr = String(dt).trim();
+    
+    // "20260804" 형식
+    if (dtStr.length === 8 && /^\d{8}$/.test(dtStr)) {
+      const year = parseInt(dtStr.substring(0, 4));
+      const month = parseInt(dtStr.substring(4, 6));
+      const day = parseInt(dtStr.substring(6, 8));
       return year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
     }
-    if (dt.includes("-")) {
-      const parts = dt.split("-");
+    
+    // "2026-08-04" 형식
+    if (dtStr.includes("-")) {
+      const parts = dtStr.split("-");
       if (parts.length === 3 && parts[0].length === 4 && parts[1].length === 2 && parts[2].length === 2) {
         const year = parseInt(parts[0]);
         const month = parseInt(parts[1]);
@@ -61,57 +48,54 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         return year >= 2000 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
       }
     }
+    
     return false;
   };
 
   // 월별 데이터 집계
   const monthlyData = useMemo(() => {
-    if (skuColumnIndex === -1 || productDailyRows.length < 6) {
-      console.log("📊 [Modal] Cannot extract monthly data - invalid column or not enough rows");
-      return { labels: [], datasets: [] };
-    }
-
+    console.log(`📊 [Modal] Aggregating data for: ${product.sku}`);
+    console.log(`📊 [Modal] dailyData length: ${dailyData.length}`);
+    
     const monthMap: Record<string, number> = {};
-    let validRowCount = 0;
+    let validCount = 0;
 
-    // Row 5부터 데이터 시작
-    for (let rowIdx = 5; rowIdx < productDailyRows.length; rowIdx++) {
-      const row = productDailyRows[rowIdx];
-      const dt = row[0]?.trim();
-      const revenue = row[skuColumnIndex];
+    dailyData.forEach((row, idx) => {
+      const dt = row.dt;
+      const krw = row.krw;
 
       // 날짜 검증
       if (!isValidDate(dt)) {
-        if (rowIdx < 10) console.log(`  Row ${rowIdx}: Invalid date: ${dt}`);
-        continue;
+        if (idx < 5) console.log(`  Row ${idx}: Invalid date "${dt}"`);
+        return;
       }
 
-      const revenueNum = parseInt(revenue) || 0;
-      if (revenueNum === 0) continue;
+      const krwNum = parseFloat(String(krw)) || 0;
+      if (krwNum <= 0) return;
 
       // 날짜를 월로 변환
+      const dtStr = String(dt);
       let monthKey = "";
-      if (dt.length === 8) {
-        monthKey = dt.substring(2, 6); // "20260804" → "2608"
-      } else if (dt.includes("-")) {
-        const parts = dt.split("-");
+      
+      if (dtStr.length === 8) {
+        monthKey = dtStr.substring(2, 6); // "20260804" → "2608"
+      } else if (dtStr.includes("-")) {
+        const parts = dtStr.split("-");
         monthKey = parts[0].substring(2) + parts[1]; // "2026-08" → "2608"
-      } else {
-        continue;
       }
 
       if (!monthMap[monthKey]) {
         monthMap[monthKey] = 0;
       }
-      monthMap[monthKey] += revenueNum;
-      validRowCount++;
+      monthMap[monthKey] += krwNum;
+      validCount++;
 
-      if (validRowCount < 5) {
-        console.log(`  Row ${rowIdx} (${dt}): month=${monthKey}, revenue=${revenueNum}`);
+      if (validCount <= 3) {
+        console.log(`  Valid row ${idx}: ${dt} → ${monthKey}, krw=${krwNum}`);
       }
-    }
+    });
 
-    console.log(`📊 [Modal] Processed ${validRowCount} valid rows`);
+    console.log(`📊 [Modal] Valid rows: ${validCount}`);
     console.log("📊 [Modal] Month map:", monthMap);
 
     const sorted = Object.entries(monthMap)
@@ -140,17 +124,12 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         },
       ],
     };
-  }, [productDailyRows, skuColumnIndex, isValidDate]);
+  }, [dailyData, product.sku, isValidDate]);
 
   // 주간 데이터 + 샘플 출고수
   const weeklyAndSampleData = useMemo(() => {
-    if (skuColumnIndex === -1 || productDailyRows.length < 6) {
-      return { labels: [], datasets: [] };
-    }
-
     const weeks = [];
     const today = new Date();
-    const smpColumnIndex = skuColumnIndex + 2; // 샘플 출고수는 3열씩의 마지막 열
 
     for (let i = 3; i >= 0; i--) {
       const weekEnd = new Date(today);
@@ -161,37 +140,36 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
       let weekRevenue = 0;
       let weekSample = 0;
 
-      // Row 5부터 데이터 시작
-      for (let rowIdx = 5; rowIdx < productDailyRows.length; rowIdx++) {
-        const row = productDailyRows[rowIdx];
-        const dt = row[0]?.trim();
-        const revenue = row[skuColumnIndex];
-        const sample = row[smpColumnIndex];
+      dailyData.forEach((row) => {
+        const dt = row.dt;
+        const krw = row.krw;
+        const smp = row.smp;
 
-        // 날짜 검증
-        if (!isValidDate(dt)) continue;
+        if (!isValidDate(dt)) return;
 
+        const dtStr = String(dt);
         let rowDate: Date;
-        if (dt.length === 8) {
-          const year = parseInt(dt.substring(0, 4));
-          const month = parseInt(dt.substring(4, 6));
-          const day = parseInt(dt.substring(6, 8));
+
+        if (dtStr.length === 8) {
+          const year = parseInt(dtStr.substring(0, 4));
+          const month = parseInt(dtStr.substring(4, 6));
+          const day = parseInt(dtStr.substring(6, 8));
           rowDate = new Date(year, month - 1, day);
-        } else if (dt.includes("-")) {
-          const parts = dt.split("-");
+        } else if (dtStr.includes("-")) {
+          const parts = dtStr.split("-");
           const year = parseInt(parts[0]);
           const month = parseInt(parts[1]);
           const day = parseInt(parts[2]);
           rowDate = new Date(year, month - 1, day);
         } else {
-          continue;
+          return;
         }
 
         if (rowDate >= weekStart && rowDate <= weekEnd) {
-          if (revenue) weekRevenue += parseInt(revenue) || 0;
-          if (sample) weekSample += parseInt(sample) || 0;
+          if (krw) weekRevenue += parseFloat(String(krw)) || 0;
+          if (smp) weekSample += parseFloat(String(smp)) || 0;
         }
-      }
+      });
 
       weeks.push({
         week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`,
@@ -221,7 +199,7 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         },
       ],
     };
-  }, [productDailyRows, skuColumnIndex, isValidDate]);
+  }, [dailyData, isValidDate]);
 
   const monthlyChartOptions = {
     responsive: true,
