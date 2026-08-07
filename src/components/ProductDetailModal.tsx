@@ -13,6 +13,12 @@ interface DailyRow {
   [key: string]: any;
 }
 
+interface SojaeRow {
+  sku?: string;
+  dt?: string;
+  [key: string]: any;
+}
+
 interface ProductDetailModalProps {
   product: {
     name: string;
@@ -20,10 +26,19 @@ interface ProductDetailModalProps {
     pid: string;
   };
   dailyData: DailyRow[];
+  sojaeData?: SojaeRow[];
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
+export default function ProductDetailModal({ product, dailyData, sojaeData = [], onClose }: ProductDetailModalProps) {
+  // sojae 데이터 구조 확인 (처음 한 번만)
+  useMemo(() => {
+    if (sojaeData && sojaeData.length > 0) {
+      console.log("📊 [Modal] Sojae data length:", sojaeData.length);
+      console.log("📊 [Modal] Sample sojae row:", sojaeData[0]);
+      console.log("📊 [Modal] Sojae row keys:", Object.keys(sojaeData[0]));
+    }
+  }, [sojaeData]);
   // 날짜 검증
   const isValidDate = (dt: any): boolean => {
     if (!dt) return false;
