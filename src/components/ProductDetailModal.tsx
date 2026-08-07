@@ -29,9 +29,16 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
   // 월별 데이터 집계
   const monthlyData = useMemo(() => {
     if (skuColumnIndex === -1 || productDailyRows.length < 6) {
-      console.log("📊 [Modal] Cannot extract monthly data - invalid column");
+      console.log("📊 [Modal] Cannot extract monthly data - invalid column or not enough rows");
+      console.log(`  - skuColumnIndex: ${skuColumnIndex}`);
+      console.log(`  - productDailyRows.length: ${productDailyRows.length}`);
       return { labels: [], datasets: [] };
     }
+
+    console.log("📊 [Modal] Starting monthly data extraction...");
+    console.log(`  - SKU Column Index: ${skuColumnIndex}`);
+    console.log(`  - Total rows: ${productDailyRows.length}`);
+    console.log(`  - Sample row 5 (index 5):`, productDailyRows[5]);
 
     const monthMap: Record<string, number> = {};
 
@@ -41,7 +48,15 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
       const dt = row[0]?.trim();
       const revenue = row[skuColumnIndex];
 
-      if (!dt || !revenue) continue;
+      if (!dt) {
+        console.log(`  - Row ${rowIdx}: No date`);
+        continue;
+      }
+
+      if (!revenue) {
+        console.log(`  - Row ${rowIdx} (${dt}): No revenue at column ${skuColumnIndex}`);
+        continue;
+      }
 
       // 날짜를 월로 변환
       let monthKey = "";
@@ -51,14 +66,22 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         const parts = dt.split("-");
         monthKey = parts[0].substring(2) + parts[1]; // "2026-08" → "2608"
       } else {
+        console.log(`  - Row ${rowIdx}: Invalid date format: ${dt}`);
         continue;
       }
 
+      const revenueNum = parseInt(revenue) || 0;
       if (!monthMap[monthKey]) {
         monthMap[monthKey] = 0;
       }
-      monthMap[monthKey] += parseInt(revenue) || 0;
+      monthMap[monthKey] += revenueNum;
+      
+      if (rowIdx < 8) {
+        console.log(`  - Row ${rowIdx} (${dt}): month=${monthKey}, revenue=${revenueNum}`);
+      }
     }
+
+    console.log("📊 [Modal] Monthly map:", monthMap);
 
     const sorted = Object.entries(monthMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -68,7 +91,7 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         revenue,
       }));
 
-    console.log("📊 [Modal] Monthly data:", sorted);
+    console.log("📊 [Modal] Final monthly data:", sorted);
 
     return {
       labels: sorted.map((d) => d.month),
