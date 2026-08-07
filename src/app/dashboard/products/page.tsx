@@ -205,6 +205,7 @@ export default function ProductsPage() {
         <ProductDetailModal
           product={selectedProduct}
           dailyData={data.daily}
+          sojaeData={data?.sojae || []}
           onClose={() => setSelectedProduct(null)}
         />
       )}
