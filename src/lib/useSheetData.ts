@@ -203,6 +203,11 @@ export function useSheetData() {
         let productDailyRows: string[][] = [];
         try {
           productDailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
+          console.log("📊 [useSheetData] productDailyRows loaded - length:", productDailyRows.length);
+          if (productDailyRows.length > 5) {
+            console.log("📊 [useSheetData] Row 5 (first data row):", productDailyRows[5]?.slice(0, 5));
+            console.log("📊 [useSheetData] Row 6:", productDailyRows[6]?.slice(0, 5));
+          }
         } catch (err) {
           console.warn("Product daily sheet loading failed");
         }
