@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useSheetData } from "@/lib/useSheetData";
 import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
+import ProductDetailModal from "@/components/ProductDetailModal";
 
 interface ProductItem {
   name: string;
@@ -14,6 +15,7 @@ interface ProductItem {
 export default function ProductsPage() {
   const { data, loading, error } = useSheetData();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
   // 제품 목록 생성
   const allProducts = useMemo(() => {
@@ -129,6 +131,7 @@ export default function ProductsPage() {
                     {searchResults.map((product, idx) => (
                       <div
                         key={idx}
+                        onClick={() => setSelectedProduct(product)}
                         style={{
                           padding: "16px",
                           background: "#f9fafb",
@@ -141,11 +144,13 @@ export default function ProductsPage() {
                           e.currentTarget.style.background = "#f0f9ff";
                           e.currentTarget.style.borderColor = "#3b82f6";
                           e.currentTarget.style.boxShadow = "0 2px 8px rgba(59, 130, 246, 0.1)";
+                          e.currentTarget.style.transform = "translateY(-2px)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = "#f9fafb";
                           e.currentTarget.style.borderColor = "#e5e7eb";
                           e.currentTarget.style.boxShadow = "none";
+                          e.currentTarget.style.transform = "translateY(0)";
                         }}
                       >
                         <div style={{ display: "grid", gap: "8px" }}>
@@ -194,6 +199,15 @@ export default function ProductsPage() {
           </div>
         )}
       </main>
+
+      {/* 제품 상세 정보 모달 */}
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          dailyData={data?.daily || []}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </div>
   );
 }
