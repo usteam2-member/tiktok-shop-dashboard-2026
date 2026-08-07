@@ -19,6 +19,14 @@ interface ProductDetailModalProps {
 }
 
 export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
+  // dailyData 구조 로그 (처음 한 번만)
+  useMemo(() => {
+    if (dailyData.length > 0) {
+      console.log("📊 [Modal] Sample dailyData row:", dailyData[0]);
+      console.log("📊 [Modal] dailyData keys:", Object.keys(dailyData[0]));
+      console.log("📊 [Modal] Product SKU:", product.sku);
+    }
+  }, [dailyData, product.sku]);
   // 월별 데이터 집계 (실제 데이터 기반)
   const monthlyData = useMemo(() => {
     const monthMap: Record<string, number> = {};
