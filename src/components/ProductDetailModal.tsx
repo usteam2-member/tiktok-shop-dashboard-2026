@@ -43,7 +43,9 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
 
     dailyData.forEach((row) => {
       const dt = row.dt as string;
-      if (!dt) return;
+      const krw = row.krw as number; // 실제 매출액 데이터
+      
+      if (!dt || !krw) return;
 
       // dt 형식: "20260804" → "2608" (연도 마지막 2자리 + 월)
       let monthKey = "";
@@ -56,7 +58,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
         if (parts.length === 3 && parts[0].length === 4 && parts[1].length === 2) {
           monthKey = parts[0].substring(2) + parts[1]; // "2608"
         } else {
-          return; // 잘못된 형식은 무시
+          return;
         }
       } else {
         return;
@@ -70,7 +72,8 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       if (!monthMap[monthKey]) {
         monthMap[monthKey] = 0;
       }
-      monthMap[monthKey] += Math.floor(Math.random() * 50000);
+      // 실제 krw 값을 합산
+      monthMap[monthKey] += krw;
     });
 
     // 최근 12개월 데이터
@@ -82,7 +85,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
         revenue,
       }));
 
-    console.log("📊 [Modal] Monthly data:", sorted);
+    console.log("📊 [Modal] Monthly data (실제):", sorted);
 
     return {
       labels: sorted.map((d) => d.month),
@@ -119,6 +122,9 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
 
       dailyData.forEach((row) => {
         const dt = row.dt as string;
+        const krw = row.krw as number;
+        const smp = row.smp as number;
+        
         if (!dt) return;
 
         let rowDate: Date;
@@ -141,8 +147,8 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
         }
 
         if (rowDate >= weekStart && rowDate <= weekEnd) {
-          weekRevenue += Math.floor(Math.random() * 40000);
-          weekSample += Math.floor(Math.random() * 60);
+          if (krw) weekRevenue += krw;
+          if (smp) weekSample += smp;
         }
       });
 
@@ -153,7 +159,7 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       });
     }
 
-    console.log("📊 [Modal] Weekly data:", weeks);
+    console.log("📊 [Modal] Weekly data (실제):", weeks);
 
     return {
       labels: weeks.map((w) => w.week),
