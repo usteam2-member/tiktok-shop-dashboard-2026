@@ -24,6 +24,19 @@ interface ProductDetailModalProps {
 }
 
 export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
+  // daily 데이터 구조 확인
+  useMemo(() => {
+    console.log(`📊 [Modal] Product: ${product.sku}`);
+    console.log(`📊 [Modal] dailyData length: ${dailyData.length}`);
+    if (dailyData.length > 0) {
+      console.log("📊 [Modal] First row:", dailyData[0]);
+      console.log("📊 [Modal] Row keys:", Object.keys(dailyData[0]));
+      // 처음 5개 행의 dt와 krw 확인
+      for (let i = 0; i < Math.min(5, dailyData.length); i++) {
+        console.log(`  Row ${i}: dt=${dailyData[i].dt}, krw=${dailyData[i].krw}`);
+      }
+    }
+  }, [dailyData, product.sku]);
   // 월별 데이터 집계
   const monthlyData = useMemo(() => {
     console.log(`📊 [Modal] Aggregating monthly data for SKU: ${product.sku}`);
