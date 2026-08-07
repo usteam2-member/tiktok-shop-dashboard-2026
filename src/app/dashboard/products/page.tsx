@@ -204,7 +204,7 @@ export default function ProductsPage() {
       {selectedProduct && (
         <ProductDetailModal
           product={selectedProduct}
-          productDailyRows={data?.productDailyRows || []}
+          dailyData={data?.daily?.filter((d: any) => d.sku === selectedProduct.sku) || []}
           onClose={() => setSelectedProduct(null)}
         />
       )}
