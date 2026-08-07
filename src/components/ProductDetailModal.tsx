@@ -18,11 +18,26 @@ interface ProductDetailModalProps {
 export default function ProductDetailModal({ product, productDailyRows, onClose }: ProductDetailModalProps) {
   // SKU의 열 인덱스 찾기
   const skuColumnIndex = useMemo(() => {
-    if (productDailyRows.length < 3) return -1;
+    console.log(`📊 [Modal] Finding SKU: ${product.sku}`);
+    console.log(`📊 [Modal] productDailyRows length: ${productDailyRows.length}`);
+    
+    if (productDailyRows.length < 3) {
+      console.log("❌ [Modal] Not enough rows");
+      return -1;
+    }
     
     const skuRow = productDailyRows[2];
     const idx = skuRow.findIndex(sku => sku?.trim() === product.sku);
     console.log(`📊 [Modal] SKU ${product.sku} found at column ${idx}`);
+    
+    // 처음 20개 행의 첫 번째 열 출력 (날짜 찾기)
+    console.log("📊 [Modal] === First column of rows 0-20 ===");
+    for (let i = 0; i < Math.min(20, productDailyRows.length); i++) {
+      const row = productDailyRows[i];
+      const firstCol = row[0]?.trim() || "(empty)";
+      console.log(`  Row ${i}: "${firstCol}"`);
+    }
+    
     return idx;
   }, [productDailyRows, product.sku]);
 
