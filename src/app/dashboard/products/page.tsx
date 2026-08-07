@@ -201,10 +201,10 @@ export default function ProductsPage() {
       </main>
 
       {/* 제품 상세 정보 모달 */}
-      {selectedProduct && data?.daily && (
+      {selectedProduct && data?.productDailyRows && (
         <ProductDetailModal
           product={selectedProduct}
-          dailyData={data.daily}
+          productDailyRows={data.productDailyRows}
           onClose={() => setSelectedProduct(null)}
         />
       )}
