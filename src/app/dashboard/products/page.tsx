@@ -8,8 +8,8 @@ import ProductDetailModal from "@/components/ProductDetailModal";
 interface ProductItem {
   name: string;
   sku: string;
-  pid?: string;
-  type: string; // (단품) 또는 (번들)
+  pid: string;  // optional 제거
+  type: string;
 }
 
 export default function ProductsPage() {
