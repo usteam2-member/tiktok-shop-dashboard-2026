@@ -1,9 +1,17 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from "chart.js";
 import { Line as LineChartComponent, Bar as BarChartComponent } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
+
+interface DailyRow {
+  dt: string;
+  krw: number;
+  smp: number;
+  ord: number;
+  [key: string]: any;
+}
 
 interface ProductDetailModalProps {
   product: {
@@ -11,51 +19,30 @@ interface ProductDetailModalProps {
     sku: string;
     pid: string;
   };
-  productDailyRows: string[][];
+  dailyData: DailyRow[];
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ product, productDailyRows, onClose }: ProductDetailModalProps) {
-  // SKU의 열 인덱스 찾기
-  const skuColumnIndex = useMemo(() => {
-    if (productDailyRows.length < 3) return -1;
-    
-    const skuRow = productDailyRows[2];
-    const idx = skuRow.findIndex(sku => sku?.trim() === product.sku);
-    console.log(`📊 [Modal] SKU ${product.sku} found at column ${idx}`);
-    return idx;
-  }, [productDailyRows, product.sku]);
-
+export default function ProductDetailModal({ product, dailyData, onClose }: ProductDetailModalProps) {
   // 월별 데이터 집계
   const monthlyData = useMemo(() => {
-    if (skuColumnIndex === -1 || productDailyRows.length < 6) {
-      console.log("📊 [Modal] Cannot extract monthly data - invalid column or not enough rows");
-      console.log(`  - skuColumnIndex: ${skuColumnIndex}`);
-      console.log(`  - productDailyRows.length: ${productDailyRows.length}`);
+    console.log(`📊 [Modal] Aggregating monthly data for SKU: ${product.sku}`);
+    console.log(`📊 [Modal] dailyData length: ${dailyData.length}`);
+    
+    if (dailyData.length === 0) {
+      console.log("📊 [Modal] No daily data available");
       return { labels: [], datasets: [] };
     }
 
-    console.log("📊 [Modal] Starting monthly data extraction...");
-    console.log(`  - SKU Column Index: ${skuColumnIndex}`);
-    console.log(`  - Total rows: ${productDailyRows.length}`);
-    console.log(`  - Sample row 5 (index 5):`, productDailyRows[5]);
-
     const monthMap: Record<string, number> = {};
 
-    // Row 5부터 데이터 시작
-    for (let rowIdx = 5; rowIdx < productDailyRows.length; rowIdx++) {
-      const row = productDailyRows[rowIdx];
-      const dt = row[0]?.trim();
-      const revenue = row[skuColumnIndex];
+    dailyData.forEach((row, idx) => {
+      const dt = row.dt as string;
+      const krw = row.krw as number;
 
-      if (!dt) {
-        console.log(`  - Row ${rowIdx}: No date`);
-        continue;
-      }
-
-      if (!revenue) {
-        console.log(`  - Row ${rowIdx} (${dt}): No revenue at column ${skuColumnIndex}`);
-        continue;
+      if (!dt || !krw) {
+        if (idx < 3) console.log(`  Row ${idx}: Missing dt or krw`, { dt, krw });
+        return;
       }
 
       // 날짜를 월로 변환
@@ -66,22 +53,20 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         const parts = dt.split("-");
         monthKey = parts[0].substring(2) + parts[1]; // "2026-08" → "2608"
       } else {
-        console.log(`  - Row ${rowIdx}: Invalid date format: ${dt}`);
-        continue;
+        return;
       }
 
-      const revenueNum = parseInt(revenue) || 0;
       if (!monthMap[monthKey]) {
         monthMap[monthKey] = 0;
       }
-      monthMap[monthKey] += revenueNum;
-      
-      if (rowIdx < 8) {
-        console.log(`  - Row ${rowIdx} (${dt}): month=${monthKey}, revenue=${revenueNum}`);
-      }
-    }
+      monthMap[monthKey] += krw;
 
-    console.log("📊 [Modal] Monthly map:", monthMap);
+      if (idx < 3) {
+        console.log(`  Row ${idx}: ${dt} → ${monthKey}, krw=${krw}`);
+      }
+    });
+
+    console.log("📊 [Modal] Month map:", monthMap);
 
     const sorted = Object.entries(monthMap)
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -109,17 +94,12 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         },
       ],
     };
-  }, [productDailyRows, skuColumnIndex]);
+  }, [dailyData, product.sku]);
 
   // 주간 데이터 + 샘플 출고수
   const weeklyAndSampleData = useMemo(() => {
-    if (skuColumnIndex === -1 || productDailyRows.length < 6) {
-      return { labels: [], datasets: [] };
-    }
-
     const weeks = [];
     const today = new Date();
-    const smpColumnIndex = skuColumnIndex + 2; // 샘플 출고수는 3열씩의 마지막 열
 
     for (let i = 3; i >= 0; i--) {
       const weekEnd = new Date(today);
@@ -130,16 +110,15 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
       let weekRevenue = 0;
       let weekSample = 0;
 
-      // Row 5부터 데이터 시작
-      for (let rowIdx = 5; rowIdx < productDailyRows.length; rowIdx++) {
-        const row = productDailyRows[rowIdx];
-        const dt = row[0]?.trim();
-        const revenue = row[skuColumnIndex];
-        const sample = row[smpColumnIndex];
+      dailyData.forEach((row) => {
+        const dt = row.dt as string;
+        const krw = row.krw as number;
+        const smp = row.smp as number;
 
-        if (!dt) continue;
+        if (!dt) return;
 
         let rowDate: Date;
+
         if (dt.length === 8) {
           const year = parseInt(dt.substring(0, 4));
           const month = parseInt(dt.substring(4, 6));
@@ -152,14 +131,14 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
           const day = parseInt(parts[2]);
           rowDate = new Date(year, month - 1, day);
         } else {
-          continue;
+          return;
         }
 
         if (rowDate >= weekStart && rowDate <= weekEnd) {
-          if (revenue) weekRevenue += parseInt(revenue) || 0;
-          if (sample) weekSample += parseInt(sample) || 0;
+          if (krw) weekRevenue += krw;
+          if (smp) weekSample += smp;
         }
-      }
+      });
 
       weeks.push({
         week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`,
@@ -189,7 +168,7 @@ export default function ProductDetailModal({ product, productDailyRows, onClose 
         },
       ],
     };
-  }, [productDailyRows, skuColumnIndex]);
+  }, [dailyData]);
 
   const monthlyChartOptions = {
     responsive: true,
