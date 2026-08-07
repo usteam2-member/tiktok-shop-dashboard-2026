@@ -24,7 +24,17 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
     if (dailyData.length > 0) {
       console.log("📊 [Modal] Sample dailyData row:", dailyData[0]);
       console.log("📊 [Modal] dailyData keys:", Object.keys(dailyData[0]));
+      
+      // 첫 번째 행의 모든 키와 값 출력
+      const firstRow = dailyData[0];
+      Object.entries(firstRow).forEach(([key, value]) => {
+        console.log(`  - ${key}: ${value} (type: ${typeof value})`);
+      });
+      
       console.log("📊 [Modal] Product SKU:", product.sku);
+      
+      // SKU와 관련된 열을 찾기 위해 products 정보도 출력
+      console.log("📊 [Modal] Looking for SKU:", product.sku);
     }
   }, [dailyData, product.sku]);
   // 월별 데이터 집계 (실제 데이터 기반)
