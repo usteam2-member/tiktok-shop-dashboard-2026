@@ -10,6 +10,7 @@ export interface SheetData {
     increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
     decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
   }>;
+  productDailyRows: string[][];  // productDaily 시트의 원본 데이터
   updatedAt: string;
 }
 
@@ -524,6 +525,7 @@ export function useSheetData() {
           productTop10ByPeriod,
           sojae,
           anomaliesByDate,
+          productDailyRows,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {
