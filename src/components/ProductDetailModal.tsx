@@ -35,8 +35,17 @@ export default function ProductDetailModal({ product, dailyData, onClose }: Prod
       } else if (dt.includes("-")) {
         // "2026-08-04" 형식
         const parts = dt.split("-");
-        monthKey = parts[0].substring(2) + parts[1]; // "2608"
+        if (parts.length === 3 && parts[0].length === 4 && parts[1].length === 2) {
+          monthKey = parts[0].substring(2) + parts[1]; // "2608"
+        } else {
+          return; // 잘못된 형식은 무시
+        }
       } else {
+        return;
+      }
+
+      // 유효한 월 형식만 (YYOMM: 4자리 숫자)
+      if (!/^\d{4}$/.test(monthKey)) {
         return;
       }
 
