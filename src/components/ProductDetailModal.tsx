@@ -14,13 +14,6 @@ interface DailyRow {
 }
 
 interface SojaeRow {
-  dt: string;
-  sku: string;
-  productName?: string;
-  totalVideo?: number;
-  newVideo?: number;
-  makingSales?: number;
-  gmv?: number;
   [key: string]: any;
 }
 
@@ -240,19 +233,19 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
     console.log(`📊 [Modal] sojaeData length: ${sojaeData.length}`);
     
     // SKU별 필터링
-    const skuFiltered = sojaeData.filter(row => row.sku === product.sku);
+    const skuFiltered = sojaeData.filter((row: any) => row?.sku === product.sku);
     console.log(`📊 [Modal] Sojae rows for SKU: ${skuFiltered.length}`);
     
     // 월별 합계
     const monthMap: Record<string, { totalVideo: number; newVideo: number; makingSales: number }> = {};
     
-    skuFiltered.forEach((row, idx) => {
-      const dt = row.dt;
+    skuFiltered.forEach((row: any, idx: number) => {
+      const dt = row?.dt;
       if (!dt) return;
       
-      const totalVideo = row.totalVideo || 0;
-      const newVideo = row.newVideo || 0;
-      const makingSales = row.makingSales || 0;
+      const totalVideo = parseFloat(row?.totalVideo) || 0;
+      const newVideo = parseFloat(row?.newVideo) || 0;
+      const makingSales = parseFloat(row?.makingSales) || 0;
       
       if (!monthMap[dt]) {
         monthMap[dt] = { totalVideo: 0, newVideo: 0, makingSales: 0 };
