@@ -149,21 +149,69 @@ function parseProductData(rows: string[][]): ProductRow[] {
 }
 
 function parseSojaeData(rows: string[][]): SojaeRow[] {
-  if (rows.length < 2) return [];
+  if (rows.length < 5) return []; // Row 4(헤더)까지 필요
+  
   const result: SojaeRow[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length < 4) continue;
-    const dt = row[0]?.trim();
-    const name = row[1]?.trim();
-    if (!dt || !name) continue;
-    result.push({
-      dt,
-      name,
-      count: safeNum(row[2]),
-      revenue: safeNum(row[3]),
+  const skuRow = rows[1]; // Row 2 (0-indexed: rows[1])
+  const productsRow = rows[2]; // Row 3
+  const headerRow = rows[3]; // Row 4
+  
+  // 각 SKU 블록 찾기 (4개 열씩: total, new, making_sales, gmv)
+  // SKU는 C부터 시작 (인덱스 2)
+  const skuBlocks: Array<{ skuIdx: number; sku: string; productName: string }> = [];
+  
+  for (let colIdx = 2; colIdx < (skuRow?.length || 0); colIdx += 4) {
+    const sku = skuRow[colIdx]?.trim();
+    if (!sku) continue;
+    
+    const productName = productsRow?.[colIdx]?.trim() || "";
+    skuBlocks.push({ skuIdx: colIdx, sku, productName });
+  }
+  
+  console.log("📊 [parseSojaeData] Found SKU blocks:", skuBlocks.length);
+  skuBlocks.forEach((block, i) => {
+    console.log(`  Block ${i}: SKU=${block.sku}, colIdx=${block.skuIdx}, product=${block.productName}`);
+  });
+  
+  // Row 5부터 데이터 파싱 (rows[4]부터)
+  for (let rowIdx = 4; rowIdx < rows.length; rowIdx++) {
+    const row = rows[rowIdx];
+    const dt = row[0]?.trim(); // A열: 월 (2601, 2602, ...)
+    
+    if (!dt || !/^\d{4}$/.test(dt)) continue; // YYOMM 형식만
+    
+    // 각 SKU별 데이터 추출
+    skuBlocks.forEach((block) => {
+      const totalVideoIdx = block.skuIdx; // C, G, K, ...
+      const newVideoIdx = block.skuIdx + 1; // D, H, L, ...
+      const makingSalesIdx = block.skuIdx + 2; // E, I, M, ...
+      const gmvIdx = block.skuIdx + 3; // F, J, N, ...
+      
+      const totalVideo = safeNum(row[totalVideoIdx]);
+      const newVideo = safeNum(row[newVideoIdx]);
+      const makingSales = safeNum(row[makingSalesIdx]);
+      const gmv = safeNum(row[gmvIdx]);
+      
+      // 하나라도 0이 아니면 저장
+      if (totalVideo > 0 || newVideo > 0 || makingSales > 0 || gmv > 0) {
+        result.push({
+          dt,
+          sku: block.sku,
+          productName: block.productName,
+          totalVideo,
+          newVideo,
+          makingSales,
+          gmv,
+        });
+      }
     });
   }
+  
+  console.log("📊 [parseSojaeData] Parsed rows:", result.length);
+  if (result.length > 0) {
+    console.log("  Sample:", result[0]);
+  }
+  
   return result;
 }
 
