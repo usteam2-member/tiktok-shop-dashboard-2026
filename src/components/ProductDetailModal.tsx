@@ -14,8 +14,13 @@ interface DailyRow {
 }
 
 interface SojaeRow {
-  sku?: string;
-  dt?: string;
+  dt: string;
+  sku: string;
+  productName?: string;
+  totalVideo?: number;
+  newVideo?: number;
+  makingSales?: number;
+  gmv?: number;
   [key: string]: any;
 }
 
@@ -34,9 +39,22 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
   // sojae 데이터 구조 확인 (처음 한 번만)
   useMemo(() => {
     if (sojaeData && sojaeData.length > 0) {
+      console.log("📊 [Modal] === Sojae Data Structure ===");
       console.log("📊 [Modal] Sojae data length:", sojaeData.length);
       console.log("📊 [Modal] Sample sojae row:", sojaeData[0]);
-      console.log("📊 [Modal] Sojae row keys:", Object.keys(sojaeData[0]));
+      
+      // 모든 필드명과 값 출력
+      const firstRow = sojaeData[0];
+      console.log("📊 [Modal] Sojae row fields:");
+      Object.entries(firstRow).forEach(([key, value]) => {
+        console.log(`  - ${key}: ${value}`);
+      });
+      
+      // 처음 5개 행 출력 (SKU 찾기용)
+      console.log("📊 [Modal] First 5 rows:");
+      for (let i = 0; i < Math.min(5, sojaeData.length); i++) {
+        console.log(`  Row ${i}:`, sojaeData[i]);
+      }
     }
   }, [sojaeData]);
   // 날짜 검증
@@ -216,6 +234,78 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
     };
   }, [dailyData, isValidDate]);
 
+  // 소재 월별 데이터 집계
+  const sojaeMonthlyData = useMemo(() => {
+    console.log(`📊 [Modal] Aggregating sojae data for: ${product.sku}`);
+    console.log(`📊 [Modal] sojaeData length: ${sojaeData.length}`);
+    
+    // SKU별 필터링
+    const skuFiltered = sojaeData.filter(row => row.sku === product.sku);
+    console.log(`📊 [Modal] Sojae rows for SKU: ${skuFiltered.length}`);
+    
+    // 월별 합계
+    const monthMap: Record<string, { totalVideo: number; newVideo: number; makingSales: number }> = {};
+    
+    skuFiltered.forEach((row, idx) => {
+      const dt = row.dt;
+      if (!dt) return;
+      
+      const totalVideo = row.totalVideo || 0;
+      const newVideo = row.newVideo || 0;
+      const makingSales = row.makingSales || 0;
+      
+      if (!monthMap[dt]) {
+        monthMap[dt] = { totalVideo: 0, newVideo: 0, makingSales: 0 };
+      }
+      monthMap[dt].totalVideo += totalVideo;
+      monthMap[dt].newVideo += newVideo;
+      monthMap[dt].makingSales += makingSales;
+      
+      if (idx < 3) {
+        console.log(`  Row ${idx}: dt=${dt}, total=${totalVideo}, new=${newVideo}, sales=${makingSales}`);
+      }
+    });
+    
+    console.log("📊 [Modal] Sojae month map:", monthMap);
+    
+    const sorted = Object.entries(monthMap)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-12)
+      .map(([month, data]) => ({
+        month,
+        ...data,
+      }));
+    
+    console.log("📊 [Modal] Final sojae monthly data:", sorted);
+    
+    return {
+      labels: sorted.map((d) => d.month),
+      datasets: [
+        {
+          label: "신규 소재",
+          data: sorted.map((d) => d.newVideo),
+          backgroundColor: "#8b5cf6",
+          borderRadius: 4,
+          yAxisID: "y",
+        },
+        {
+          label: "매출 소재",
+          data: sorted.map((d) => d.makingSales),
+          backgroundColor: "#ec4899",
+          borderRadius: 4,
+          yAxisID: "y",
+        },
+        {
+          label: "총 소재",
+          data: sorted.map((d) => d.totalVideo),
+          backgroundColor: "#06b6d4",
+          borderRadius: 4,
+          yAxisID: "y",
+        },
+      ],
+    };
+  }, [sojaeData, product.sku]);
+
   const monthlyChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -302,6 +392,48 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
         title: {
           display: true,
           text: "출고수",
+        },
+      },
+      x: {
+        ticks: { font: { size: 12 } },
+        grid: { display: false },
+      },
+    },
+  };
+
+  const sojaeChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: "index" as const,
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        labels: { font: { size: 12 }, usePointStyle: true },
+      },
+      tooltip: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        titleFont: { size: 13 },
+        bodyFont: { size: 12 },
+        padding: 10,
+        borderRadius: 6,
+        displayColors: true,
+        callbacks: {
+          label: function(context: any) {
+            return context.dataset.label + ': ' + context.parsed.y.toLocaleString() + '개';
+          }
+        }
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { font: { size: 12 } },
+        grid: { color: "rgba(0, 0, 0, 0.05)" },
+        title: {
+          display: true,
+          text: "소재 개수",
         },
       },
       x: {
@@ -425,6 +557,29 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
               ) : (
                 <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
                   데이터를 불러올 수 없습니다
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 소재 월별 데이터 */}
+          <div style={{ marginTop: "32px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
+              📊 소재 월별 현황 (최근 12개월)
+            </h3>
+            <div
+              style={{
+                background: "#f9fafb",
+                padding: "16px",
+                borderRadius: "8px",
+                height: "350px",
+              }}
+            >
+              {sojaeMonthlyData.labels.length > 0 ? (
+                <BarChartComponent data={sojaeMonthlyData} options={sojaeChartOptions as any} />
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
+                  소재 데이터를 불러올 수 없습니다
                 </div>
               )}
             </div>
