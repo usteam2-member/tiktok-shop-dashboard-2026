@@ -1,5 +1,17 @@
 import { useState, useEffect } from "react";
-import { DailyRow, ProductRow, SojaeRow, ProductTop10Item, ProductDailySeries, getProductType, filterByRange } from "./data";
+import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType, filterByRange } from "./data";
+
+// SojaeRow 타입 재정의 (data.ts의 것 대신)
+interface SojaeRow {
+  dt: string;
+  sku: string;
+  productName?: string;
+  totalVideo: number;
+  newVideo: number;
+  makingSales: number;
+  gmv: number;
+  [key: string]: any;
+}
 
 export interface SheetData {
   daily: DailyRow[];
