@@ -191,8 +191,18 @@ export function useSheetData() {
         }
 
         let sojae: SojaeRow[] = [];
+        let sojaeRows: string[][] = [];
         try {
-          const sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
+          sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
+          console.log("📊 [useSheetData] === Sojae Raw Data ===");
+          console.log("📊 [useSheetData] Sojae rows length:", sojaeRows.length);
+          
+          // 첫 10개 행 출력 (구조 파악용)
+          console.log("📊 [useSheetData] First 10 raw rows:");
+          for (let i = 0; i < Math.min(10, sojaeRows.length); i++) {
+            console.log(`  Row ${i}:`, sojaeRows[i]?.slice(0, 8)); // 첫 8개 열만
+          }
+          
           sojae = parseSojaeData(sojaeRows);
         } catch (err) {
           console.warn("Sojae sheet loading failed, using empty array");
