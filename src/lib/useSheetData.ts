@@ -18,6 +18,33 @@ interface SojaeRow {
   [key: string]: any;
 }
 
+// 제품별 일별 매출 — "GMV | by Product" 시트의 각 제품 '매출액(KRW)' 열
+export interface ProductDaily {
+  products: { sku: string; name: string }[];              // 표시 이름에 (단품)/(번들) 포함
+  days: { date: string; rev: number[]; ord: number[] }[]; // date = "YYYY-MM-DD", 배열 순서 = products 순서
+}
+
+export interface TopProduct {
+  sku: string;
+  name: string;
+  revenue: number;
+  orders: number;
+}
+
+// 선택한 기간(start~end, "YYYY-MM-DD")의 제품별 매출 합계 → 매출 상위 n개
+export function topProductsInRange(pd: ProductDaily, start: string, end: string, n = 10): TopProduct[] {
+  const totals = pd.products.map(p => ({ ...p, revenue: 0, orders: 0 }));
+  for (const d of pd.days) {
+    if ((start && d.date < start) || (end && d.date > end)) continue;
+    d.rev.forEach((v, i) => { totals[i].revenue += v; });
+    d.ord.forEach((v, i) => { totals[i].orders += v; });
+  }
+  return totals
+    .filter(t => t.revenue > 0)
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, n);
+}
+
 interface AnomalyItem {
   name: string;
   sku: string;
@@ -33,6 +60,7 @@ export interface SheetData {
   sojae: SojaeRow[];
   anomaliesByDate: Record<string, { increases: AnomalyItem[]; decreases: AnomalyItem[] }>;
   productDailyRows: string[][]; // productDaily 시트의 원본 데이터
+  productDaily: ProductDaily;   // 제품별 일별 매출/주문 (기간 필터용)
   updatedAt: string;
 }
 
@@ -256,6 +284,29 @@ function buildAnomalies(sheet: ProductSheet) {
   return byDate;
 }
 
+function buildProductDaily(sheet: ProductSheet): ProductDaily {
+  // 같은 SKU가 여러 블록에 있으면 하나로 합침
+  const skus: string[] = [];
+  const names: Record<string, string> = {};
+  for (const b of sheet.blocks) {
+    if (!(b.sku in names)) { skus.push(b.sku); names[b.sku] = `${b.name} ${getProductType(b.sku)}`.trim(); }
+  }
+  const idx: Record<string, number> = {};
+  skus.forEach((s, i) => { idx[s] = i; });
+
+  const days = sheet.days.map(d => {
+    const rev = new Array(skus.length).fill(0);
+    const ord = new Array(skus.length).fill(0);
+    for (const b of sheet.blocks) {
+      rev[idx[b.sku]] += safeNum(d.row[b.col]);     // 매출액(KRW)
+      ord[idx[b.sku]] += safeNum(d.row[b.col + 1]); // 주문수
+    }
+    return { date: d.date, rev, ord };
+  });
+
+  return { products: skus.map(s => ({ sku: s, name: names[s] })), days };
+}
+
 function buildProducts(sheet: ProductSheet): ProductRow[] {
   const seen = new Set<string>();
   const products: ProductRow[] = [];
@@ -339,6 +390,7 @@ export function useSheetData() {
         const products = buildProducts(productSheet);
         const productTop10ByPeriod = buildTop10(productSheet);
         const anomaliesByDate = buildAnomalies(productSheet);
+        const productDaily = buildProductDaily(productSheet);
         const sojae = parseSojaeData(sojaeRows);
 
         console.log(
@@ -352,6 +404,7 @@ export function useSheetData() {
           sojae,
           anomaliesByDate,
           productDailyRows,
+          productDaily,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {

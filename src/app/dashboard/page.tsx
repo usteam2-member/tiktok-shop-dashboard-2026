@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useSheetData } from "@/lib/useSheetData";
+import { useSheetData, topProductsInRange } from "@/lib/useSheetData";
 import { filterByRange, dtToDate } from "@/lib/data";
 import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
@@ -123,21 +123,19 @@ export default function DashboardPage() {
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
+  // 📊 매출 Top 10: 상단 KPI와 같은 기간(startDate~endDate)으로 집계
   const productSalesData = useMemo(() => {
-    if (!data?.productTop10ByPeriod) return [];
-    const key = activeQuick === 1 ? "1" : activeQuick === 7 ? "7" : activeQuick === 30 ? "30" : activeQuick === 90 ? "90" : "all";
-    const top10 = data.productTop10ByPeriod[key]?.revenue || [];
-    return top10.map(p => ({
+    if (!data?.productDaily) return [];
+    return topProductsInRange(data.productDaily, startDate, endDate, 10).map(p => ({
       productName: p.name,
       sales: p.revenue,
-      orders: (p as any).orders || 0,
+      orders: p.orders,
     }));
-  }, [data, activeQuick]);
+  }, [data, startDate, endDate]);
 
-  const periodLabel = activeQuick === 1 ? "오늘 (최근 7일 차트)" :
-    activeQuick === 7 ? "최근 7일" :
-    activeQuick === 30 ? "최근 30일" :
-    activeQuick === 90 ? "최근 90일" : "전체";
+  const shopTotal = useMemo(() => kpiData.reduce((a, r) => a + r.krw, 0), [kpiData]);
+
+  const periodLabel = `${startDate} ~ ${endDate}`;
 
   // 📊 이상감지용 available dates 계산 (최근 30일만)
   const availableDates = useMemo(() => {
@@ -253,6 +251,7 @@ export default function DashboardPage() {
                   <ProductSalesChart 
                     data={productSalesData} 
                     periodLabel={periodLabel}
+                    shopTotal={shopTotal}
                   />
                 </div>
               </>

@@ -13,9 +13,12 @@ interface ProductSalesData {
 interface Props {
   data: ProductSalesData[];
   periodLabel: string;
+  shopTotal?: number; // 같은 기간 샵 전체 매출 (비교용)
 }
 
-export default function ProductSalesChart({ data, periodLabel }: Props) {
+export default function ProductSalesChart({ data, periodLabel, shopTotal }: Props) {
+  const top10Sum = [...data].sort((a, b) => b.sales - a.sales).slice(0, 10).reduce((a, p) => a + p.sales, 0);
+  const share = shopTotal && shopTotal > 0 ? (top10Sum / shopTotal) * 100 : null;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -147,6 +150,10 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
       <div style={{ marginBottom: "12px" }}>
         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text)" }}>
           매출액 Top 10 제품 ({periodLabel})
+        </div>
+        <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+          Top 10 합계 ₩{Math.round(top10Sum).toLocaleString("ko-KR")}
+          {share !== null && <> · 샵 전체 매출의 {share.toFixed(1)}%</>}
         </div>
       </div>
       <div style={{ position: "relative", height: 350 }}>
