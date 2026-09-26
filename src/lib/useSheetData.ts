@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType, filterByRange } from "./data";
+import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
+
+const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
+const GID_DAILY = "0";
+const GID_PRODUCT = "1578364048";
+const GID_SOJAE = "367495503";
 
 // SojaeRow 타입 재정의 (data.ts의 것 대신)
 interface SojaeRow {
@@ -13,16 +18,21 @@ interface SojaeRow {
   [key: string]: any;
 }
 
+interface AnomalyItem {
+  name: string;
+  sku: string;
+  yesterday: number;
+  today: number;
+  changePercent: number;
+}
+
 export interface SheetData {
   daily: DailyRow[];
   products: ProductRow[];
   productTop10ByPeriod: Record<string, { revenue: ProductTop10Item[]; orders: ProductTop10Item[] }>;
   sojae: SojaeRow[];
-  anomaliesByDate: Record<string, {
-    increases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
-    decreases: Array<{ name: string; sku: string; yesterday: number; today: number; changePercent: number }>;
-  }>;
-  productDailyRows: string[][];  // productDaily 시트의 원본 데이터
+  anomaliesByDate: Record<string, { increases: AnomalyItem[]; decreases: AnomalyItem[] }>;
+  productDailyRows: string[][]; // productDaily 시트의 원본 데이터
   updatedAt: string;
 }
 
@@ -45,188 +55,268 @@ function parseCSV(text: string): string[][] {
   return rows;
 }
 
-function safeNum(v: string): number {
+// "79,322" / "₩1,234" / "#DIV/0!" 등을 안전하게 숫자로 변환
+function safeNum(v: string | undefined): number {
+  if (!v) return 0;
   const n = parseFloat(v.replace(/[,\s₩$%#]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
-async function fetchSheet(sheetId: string, gid: string) {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+async function fetchSheet(gid: string) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch sheet ${gid}`);
   return parseCSV(await res.text());
 }
 
+// ─────────────────────────────────────────────────────────────
+// GMV | Daily
+// ─────────────────────────────────────────────────────────────
 function parseDailyData(rows: string[][]): DailyRow[] {
   if (rows.length < 3) return [];
-  
+
   const result: DailyRow[] = [];
-  
-  // rows[0] = Row 1 (PID)
-  // rows[1] = Row 4 (헤더)
-  // rows[2]+ = Row 5+ (데이터)
+
   for (let i = 2; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length < 10) continue;
-    
+
     // B열 (row[1]) = 날짜 (YYMMDD 형식)
     let dt = row[1]?.trim();
     if (!dt || dt.length !== 6 || isNaN(parseInt(dt))) continue;
-    
-    // YYMMDD를 YYYYMMDD로 변환
-    const yy = parseInt(dt.slice(0, 2));
-    const mm = dt.slice(2, 4);
-    const dd = dt.slice(4, 6);
-    dt = `20${yy}${mm}${dd}`;
-    
-    const totalRevenueUsd = safeNum(row[8] || "0");
+
+    dt = `20${dt.slice(0, 2)}${dt.slice(2, 4)}${dt.slice(4, 6)}`;
 
     result.push({
       dt,
-      aff: safeNum(row[4] || "0"),
-      smp: safeNum(row[5] || "0"),
-      ord: safeNum(row[6] || "0"),
-      krw: totalRevenueUsd,
-      adCost: safeNum(row[12] || "0"),
-      roas: safeNum(row[16] || "0"),
-      unitPriceUsd: safeNum(row[17] || "0"),
+      aff: safeNum(row[4]),
+      smp: safeNum(row[5]),
+      ord: safeNum(row[6]),
+      krw: safeNum(row[8]),
+      adCost: safeNum(row[12]),
+      roas: safeNum(row[16]),
+      unitPriceUsd: safeNum(row[17]),
     });
   }
-  
+
   let lastValidIdx = -1;
   for (let i = result.length - 1; i >= 0; i--) {
-    if (result[i].krw > 0) {
-      lastValidIdx = i;
-      break;
+    if (result[i].krw > 0) { lastValidIdx = i; break; }
+  }
+  return lastValidIdx >= 0 ? result.slice(0, lastValidIdx + 1) : result;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GMV | by Product
+//  - 헤더 행(SKU / 제품명 / 매출액·주문수·샘플출고수)을 위치가 아니라 내용으로 찾음
+//  - 날짜 행(B열 YYMMDD)만 사용 → 월 합계 행(2601 등)과 '마감 예상' 행은 자동 제외
+// ─────────────────────────────────────────────────────────────
+interface ProductBlock { col: number; sku: string; name: string; }
+interface ProductDay { date: string; row: string[]; } // date = "YYYY-MM-DD"
+interface ProductSheet { blocks: ProductBlock[]; days: ProductDay[]; latest: string; }
+
+const SKU_RE = /^(SB\d+_[A-Z]+|BD\d+)$/;
+
+function toIsoDate(raw: string | undefined): string | null {
+  const v = (raw || "").replace(/\s/g, "");
+  if (!/^2\d{5}$/.test(v)) return null; // YYMMDD 만 허용 (2601 같은 월 합계는 제외)
+  const mm = parseInt(v.slice(2, 4));
+  const dd = parseInt(v.slice(4, 6));
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  return `20${v.slice(0, 2)}-${v.slice(2, 4)}-${v.slice(4, 6)}`;
+}
+
+function addDays(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + delta));
+  return dt.toISOString().slice(0, 10);
+}
+
+function parseProductSheet(rows: string[][]): ProductSheet {
+  const empty: ProductSheet = { blocks: [], days: [], latest: "" };
+  if (rows.length < 5) return empty;
+
+  // 1) '매출액(KRW)'이 가장 많은 행 = 지표 라벨 행
+  let labelIdx = -1, maxLabel = 0;
+  for (let i = 0; i < Math.min(12, rows.length); i++) {
+    const cnt = rows[i].filter(c => c.includes("매출액(KRW)")).length;
+    if (cnt > maxLabel) { maxLabel = cnt; labelIdx = i; }
+  }
+  if (labelIdx < 0) return empty;
+
+  // 2) 라벨 행 위쪽에서 SKU 패턴이 가장 많은 행 = SKU 행
+  let skuIdx = -1, maxSku = 0;
+  for (let i = 0; i < labelIdx; i++) {
+    const cnt = rows[i].filter(c => SKU_RE.test(c.trim())).length;
+    if (cnt > maxSku) { maxSku = cnt; skuIdx = i; }
+  }
+  // 3) 제품명 행 = 라벨 행 바로 위 (SKU 행과 겹치면 SKU 행 바로 아래)
+  let nameIdx = labelIdx - 1;
+  if (nameIdx === skuIdx) nameIdx = skuIdx + 1 < labelIdx ? skuIdx + 1 : -1;
+
+  const labelRow = rows[labelIdx];
+  const skuRow = skuIdx >= 0 ? rows[skuIdx] : [];
+  const nameRow = nameIdx >= 0 ? rows[nameIdx] : [];
+
+  const blocks: ProductBlock[] = [];
+  for (let c = 0; c < labelRow.length; c++) {
+    if (!labelRow[c].includes("매출액(KRW)")) continue;
+    const sku = [skuRow[c], skuRow[c + 1], skuRow[c + 2]]
+      .map(v => (v || "").trim())
+      .find(v => SKU_RE.test(v)) || "";
+    if (!sku) continue;
+    const name = (nameRow[c] || "").trim() || sku;
+    blocks.push({ col: c, sku, name });
+  }
+
+  // 4) 날짜 행만 수집 (B열 우선, 없으면 C열)
+  const seen = new Set<string>();
+  const days: ProductDay[] = [];
+  for (let i = labelIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    const date = toIsoDate(row[1]) || toIsoDate(row[2]);
+    if (!date || seen.has(date)) continue;
+    seen.add(date);
+    days.push({ date, row });
+  }
+  days.sort((a, b) => a.date.localeCompare(b.date));
+
+  // 5) 실제 매출/주문이 있는 마지막 날짜 = 기준일
+  let latest = "";
+  for (let i = days.length - 1; i >= 0 && !latest; i--) {
+    const hasData = blocks.some(b => safeNum(days[i].row[b.col]) > 0 || safeNum(days[i].row[b.col + 1]) > 0);
+    if (hasData) latest = days[i].date;
+  }
+
+  // 기준일 이후(아직 입력 안 된 미래 날짜) 행은 버림
+  return { blocks, days: latest ? days.filter(d => d.date <= latest) : [], latest };
+}
+
+function buildTop10(sheet: ProductSheet) {
+  const periods: Record<string, number | null> = { "1": 1, "7": 7, "30": 30, "90": 90, "all": null };
+  const result: Record<string, { revenue: ProductTop10Item[]; orders: ProductTop10Item[] }> = {};
+
+  for (const [key, days] of Object.entries(periods)) {
+    const start = days === null ? "" : addDays(sheet.latest, -(days - 1));
+    const inRange = sheet.days.filter(d => d.date >= start && d.date <= sheet.latest);
+
+    // SKU 기준으로 합산 (같은 SKU가 여러 블록에 있어도 하나로)
+    const agg: Record<string, { name: string; revenue: number; orders: number }> = {};
+    for (const b of sheet.blocks) {
+      if (!agg[b.sku]) agg[b.sku] = { name: `${b.name} ${getProductType(b.sku)}`.trim(), revenue: 0, orders: 0 };
+      for (const d of inRange) {
+        agg[b.sku].revenue += safeNum(d.row[b.col]);
+        agg[b.sku].orders += safeNum(d.row[b.col + 1]);
+      }
     }
+
+    const items = Object.entries(agg)
+      .filter(([, v]) => v.revenue > 0 || v.orders > 0)
+      .map(([sku, v]) => ({
+        name: v.name,
+        pid: sku,
+        sku,
+        productType: getProductType(sku),
+        revenue: v.revenue,
+        orders: v.orders,
+      }));
+
+    result[key] = {
+      revenue: [...items].sort((a, b) => b.revenue - a.revenue).slice(0, 10),
+      orders: [...items].sort((a, b) => b.orders - a.orders).slice(0, 10),
+    };
   }
-  
-  if (lastValidIdx >= 0) {
-    const filtered = result.slice(0, lastValidIdx + 1);
-    console.log(`📊 Daily data: ${filtered.length} days, First: ${filtered[0].dt}, Last: ${filtered[lastValidIdx].dt}`);
-    return filtered;
-  }
-  
   return result;
 }
 
-function parseProductData(rows: string[][]): ProductRow[] {
-  if (rows.length < 2) return [];
-  
-  const headerRow = rows[0];
-  const revenueColIdx = headerRow.findIndex(h => h.includes("매출액(KRW)"));
-  if (revenueColIdx < 0) return [];
+function buildAnomalies(sheet: ProductSheet) {
+  const byDate: Record<string, { increases: AnomalyItem[]; decreases: AnomalyItem[] }> = {};
 
-  const products: Record<string, ProductRow> = {};
-  
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    if (!row || row.length <= revenueColIdx) continue;
+  for (let i = 1; i < sheet.days.length; i++) {
+    const prev = sheet.days[i - 1];
+    const today = sheet.days[i];
+    const increases: AnomalyItem[] = [];
+    const decreases: AnomalyItem[] = [];
 
-    const pidCol = row[0]?.trim();
-    if (!pidCol || pidCol.startsWith("합계")) continue;
-
-    const sku = row[2]?.trim() || "";
-    const name = row[0]?.trim() || "";
-    const revenue = safeNum(row[revenueColIdx] || "0");
-    
-    if (!name) continue;
-
-    const key = `${pidCol}-${name}`;
-    const productType = getProductType(sku);
-    const displayName = `${name} ${productType}`.trim();
-    
-    if (!products[key]) {
-      products[key] = {
-        name: displayName,
-        pid: pidCol,
-        sku,
-        productType,
-        totalRevenue: revenue,
-        ordToday: 0,
-        ord7: 0,
-        ord30: 0,
-        ordThisMonth: 0,
-        smpThisMonth: 0,
-        newSojae: 0,
-        revSojae: 0,
-        dailySeries: [],
-      };
-    } else {
-      products[key].totalRevenue += revenue;
+    for (const b of sheet.blocks) {
+      const y = safeNum(prev.row[b.col]);
+      const t = safeNum(today.row[b.col]);
+      if (y === 0) continue;
+      const changePercent = ((t - y) / y) * 100;
+      const item = { name: `${b.name} ${getProductType(b.sku)}`.trim(), sku: b.sku, yesterday: y, today: t, changePercent };
+      if (changePercent >= 10) increases.push(item);
+      else if (changePercent <= -10) decreases.push(item);
     }
-  }
 
-  return Object.values(products).sort((a, b) => b.totalRevenue - a.totalRevenue);
+    increases.sort((a, b) => b.changePercent - a.changePercent);
+    decreases.sort((a, b) => a.changePercent - b.changePercent);
+    byDate[today.date] = { increases, decreases }; // 키 형식: "2026-09-25"
+  }
+  return byDate;
 }
 
+function buildProducts(sheet: ProductSheet): ProductRow[] {
+  const seen = new Set<string>();
+  const products: ProductRow[] = [];
+  for (const b of sheet.blocks) {
+    if (seen.has(b.sku)) continue;
+    seen.add(b.sku);
+    products.push({
+      name: b.name,
+      sku: b.sku,
+      pid: b.sku,
+      productType: getProductType(b.sku),
+      totalRevenue: 0,
+      ordToday: 0,
+      ord7: 0,
+      ord30: 0,
+      ordThisMonth: 0,
+      smpThisMonth: 0,
+      newSojae: 0,
+      revSojae: 0,
+      dailySeries: [],
+    });
+  }
+  return products;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GMV | 소재
+// ─────────────────────────────────────────────────────────────
 function parseSojaeData(rows: string[][]): SojaeRow[] {
-  if (rows.length < 5) return []; // Row 4(헤더)까지 필요
-  
+  if (rows.length < 5) return [];
+
   const result: SojaeRow[] = [];
-  const skuRow = rows[1]; // Row 2 (0-indexed: rows[1])
-  const productsRow = rows[2]; // Row 3
-  const headerRow = rows[3]; // Row 4
-  
-  // 각 SKU 블록 찾기 (4개 열씩: total, new, making_sales, gmv)
-  // SKU는 C부터 시작 (인덱스 2)
+  const skuRow = rows[1];
+  const productsRow = rows[2];
+
   const skuBlocks: Array<{ skuIdx: number; sku: string; productName: string }> = [];
-  
   for (let colIdx = 2; colIdx < (skuRow?.length || 0); colIdx += 4) {
     const sku = skuRow[colIdx]?.trim();
     if (!sku) continue;
-    
-    const productName = productsRow?.[colIdx]?.trim() || "";
-    skuBlocks.push({ skuIdx: colIdx, sku, productName });
+    skuBlocks.push({ skuIdx: colIdx, sku, productName: productsRow?.[colIdx]?.trim() || "" });
   }
-  
-  console.log("📊 [parseSojaeData] Found SKU blocks:", skuBlocks.length);
-  skuBlocks.forEach((block, i) => {
-    console.log(`  Block ${i}: SKU=${block.sku}, colIdx=${block.skuIdx}, product=${block.productName}`);
-  });
-  
-  // Row 5부터 데이터 파싱 (rows[4]부터)
+
   for (let rowIdx = 4; rowIdx < rows.length; rowIdx++) {
     const row = rows[rowIdx];
-    const dt = row[0]?.trim(); // A열: 월 (2601, 2602, ...)
-    
-    if (!dt || !/^\d{4}$/.test(dt)) continue; // YYOMM 형식만
-    
-    // 각 SKU별 데이터 추출
+    const dt = row[0]?.trim();
+    if (!dt || !/^\d{4}$/.test(dt)) continue;
+
     skuBlocks.forEach((block) => {
-      const totalVideoIdx = block.skuIdx; // C, G, K, ...
-      const newVideoIdx = block.skuIdx + 1; // D, H, L, ...
-      const makingSalesIdx = block.skuIdx + 2; // E, I, M, ...
-      const gmvIdx = block.skuIdx + 3; // F, J, N, ...
-      
-      const totalVideo = safeNum(row[totalVideoIdx]);
-      const newVideo = safeNum(row[newVideoIdx]);
-      const makingSales = safeNum(row[makingSalesIdx]);
-      const gmv = safeNum(row[gmvIdx]);
-      
-      // 하나라도 0이 아니면 저장
+      const totalVideo = safeNum(row[block.skuIdx]);
+      const newVideo = safeNum(row[block.skuIdx + 1]);
+      const makingSales = safeNum(row[block.skuIdx + 2]);
+      const gmv = safeNum(row[block.skuIdx + 3]);
       if (totalVideo > 0 || newVideo > 0 || makingSales > 0 || gmv > 0) {
-        result.push({
-          dt,
-          sku: block.sku,
-          productName: block.productName,
-          totalVideo,
-          newVideo,
-          makingSales,
-          gmv,
-        });
+        result.push({ dt, sku: block.sku, productName: block.productName, totalVideo, newVideo, makingSales, gmv });
       }
     });
   }
-  
-  console.log("📊 [parseSojaeData] Parsed rows:", result.length);
-  if (result.length > 0) {
-    console.log("  Sample:", result[0]);
-  }
-  
   return result;
 }
 
+// ─────────────────────────────────────────────────────────────
 export function useSheetData() {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -238,363 +328,22 @@ export function useSheetData() {
         setLoading(true);
         setError(null);
 
-        const dailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "0");
+        const [dailyRows, productDailyRows, sojaeRows] = await Promise.all([
+          fetchSheet(GID_DAILY),
+          fetchSheet(GID_PRODUCT).catch(() => [] as string[][]),
+          fetchSheet(GID_SOJAE).catch(() => [] as string[][]),
+        ]);
+
         const daily = parseDailyData(dailyRows);
+        const productSheet = parseProductSheet(productDailyRows);
+        const products = buildProducts(productSheet);
+        const productTop10ByPeriod = buildTop10(productSheet);
+        const anomaliesByDate = buildAnomalies(productSheet);
+        const sojae = parseSojaeData(sojaeRows);
 
-        let products: ProductRow[] = [];
-        try {
-          const productRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
-          products = parseProductData(productRows);
-        } catch (err) {
-          console.warn("Product sheet loading failed, using empty array");
-          products = [];
-        }
-
-        let sojae: SojaeRow[] = [];
-        let sojaeRows: string[][] = [];
-        try {
-          sojaeRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "367495503");
-          console.log("📊 [useSheetData] === Sojae Raw Data ===");
-          console.log("📊 [useSheetData] Sojae rows length:", sojaeRows.length);
-          
-          // 첫 10개 행 출력 (구조 파악용)
-          console.log("📊 [useSheetData] First 10 raw rows:");
-          for (let i = 0; i < Math.min(10, sojaeRows.length); i++) {
-            console.log(`  Row ${i}:`, sojaeRows[i]?.slice(0, 8)); // 첫 8개 열만
-          }
-          
-          sojae = parseSojaeData(sojaeRows);
-        } catch (err) {
-          console.warn("Sojae sheet loading failed, using empty array");
-          sojae = [];
-        }
-
-        // 제품별 일일 매출 데이터 로드
-        let productDailyRows: string[][] = [];
-        try {
-          productDailyRows = await fetchSheet("1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", "1578364048");
-          console.log("📊 [useSheetData] productDailyRows loaded - length:", productDailyRows.length);
-          if (productDailyRows.length > 5) {
-            console.log("📊 [useSheetData] Row 5 (first data row) - first 10 cols:", productDailyRows[5]?.slice(0, 10));
-            console.log("📊 [useSheetData] Row 6 - first 10 cols:", productDailyRows[6]?.slice(0, 10));
-            console.log("📊 [useSheetData] Row 100 - first 10 cols:", productDailyRows[100]?.slice(0, 10));
-            console.log("📊 [useSheetData] Row 200 - first 10 cols:", productDailyRows[200]?.slice(0, 10));
-          }
-        } catch (err) {
-          console.warn("Product daily sheet loading failed");
-        }
-
-        // 제품별 일일 매출 데이터 파싱
-        const parseProductDailyData = () => {
-          if (productDailyRows.length < 6) return {};
-          
-          const codeRow = productDailyRows[2];
-          const nameRow = productDailyRows[3];
-          
-          const productDaily: Record<string, { name: string; revenue1: number; revenue7: number; revenue30: number; revenue90: number; revenueAll: number; orders1: number; orders7: number; orders30: number; orders90: number; ordersAll: number }> = {};
-          
-          // D, G, J, M 등 3열씩 추출
-          for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
-            const sku = codeRow[colIdx]?.trim();
-            if (!sku || sku === "") continue;
-            
-            const name = nameRow[colIdx]?.trim() || sku;
-            const productType = getProductType(sku);
-            const displayName = `${name} ${productType}`.trim();
-            
-            const revenueColIdx = colIdx;
-            const ordersColIdx = colIdx + 1;
-            
-            let rev1 = 0, rev7 = 0, rev30 = 0, rev90 = 0, revAll = 0;
-            let ord1 = 0, ord7 = 0, ord30 = 0, ord90 = 0, ordAll = 0;
-            
-            // Row 6부터 (index 5부터) 데이터 - 역순으로 순회하면서 실제 데이터만 카운트
-            const rows = productDailyRows.slice(5);
-            
-            let dataCount = 0; // 실제 데이터 행 개수
-            
-            for (let i = rows.length - 1; i >= 0; i--) {
-              const row = rows[i];
-              if (!row || row.length <= revenueColIdx) continue;
-              
-              const revenue = safeNum(row[revenueColIdx] || "0");
-              const orders = safeNum(row[ordersColIdx] || "0");
-              
-              // 두 값이 모두 0이면 데이터가 없는 행 - 스킵
-              if (revenue === 0 && orders === 0) continue;
-              
-              revAll += revenue;
-              ordAll += orders;
-              
-              dataCount++;
-              
-              // 역순으로 세기: 가장 뒤의 데이터가 가장 최근
-              if (dataCount === 1) {
-                rev1 += revenue;
-                ord1 += orders;
-              }
-              if (dataCount <= 7) {
-                rev7 += revenue;
-                ord7 += orders;
-              }
-              if (dataCount <= 30) {
-                rev30 += revenue;
-                ord30 += orders;
-              }
-              if (dataCount <= 90) {
-                rev90 += revenue;
-                ord90 += orders;
-              }
-            }
-            
-            if (colIdx === 3) {
-              console.log(`📊 Product ${sku}: actualDataRows=${dataCount}, rev1=${rev1}, ord1=${ord1}, rev7=${rev7}, ord7=${ord7}, rev30=${rev30}, ord30=${ord30}, rev90=${rev90}, ord90=${ord90}`);
-            }
-            
-            productDaily[sku] = {
-              name: displayName,
-              revenue1: rev1,
-              revenue7: rev7,
-              revenue30: rev30,
-              revenue90: rev90,
-              revenueAll: revAll,
-              orders1: ord1,
-              orders7: ord7,
-              orders30: ord30,
-              orders90: ord90,
-              ordersAll: ordAll,
-            };
-          }
-          
-          return productDaily;
-        };
-        
-        const productDaily = parseProductDailyData();
-
-        // 제품별 TOP 10 (기간별, 매출액 기준)
-        const generateTop10ByRevenue = (days: number | null): ProductTop10Item[] => {
-          const entries = Object.entries(productDaily);
-          if (entries.length === 0) return [];
-          
-          let revenueKey: keyof typeof productDaily[string];
-          let ordersKey: keyof typeof productDaily[string];
-          
-          if (days === 1) {
-            revenueKey = "revenue1";
-            ordersKey = "orders1";
-          } else if (days === 7) {
-            revenueKey = "revenue7";
-            ordersKey = "orders7";
-          } else if (days === 30) {
-            revenueKey = "revenue30";
-            ordersKey = "orders30";
-          } else if (days === 90) {
-            revenueKey = "revenue90";
-            ordersKey = "orders90";
-          } else {
-            revenueKey = "revenueAll";
-            ordersKey = "ordersAll";
-          }
-          
-          return entries
-            .map(([sku, data]) => ({
-              name: data.name,
-              pid: sku,
-              sku,
-              productType: getProductType(sku),
-              revenue: data[revenueKey],
-              orders: data[ordersKey],
-            }))
-            .sort((a, b) => b.revenue - a.revenue) // 매출액 기준 정렬
-            .slice(0, 10);
-        };
-
-        // 제품별 TOP 10 (기간별, 주문수 기준)
-        const generateTop10ByOrders = (days: number | null): ProductTop10Item[] => {
-          const entries = Object.entries(productDaily);
-          if (entries.length === 0) return [];
-          
-          let revenueKey: keyof typeof productDaily[string];
-          let ordersKey: keyof typeof productDaily[string];
-          
-          if (days === 1) {
-            revenueKey = "revenue1";
-            ordersKey = "orders1";
-          } else if (days === 7) {
-            revenueKey = "revenue7";
-            ordersKey = "orders7";
-          } else if (days === 30) {
-            revenueKey = "revenue30";
-            ordersKey = "orders30";
-          } else if (days === 90) {
-            revenueKey = "revenue90";
-            ordersKey = "orders90";
-          } else {
-            revenueKey = "revenueAll";
-            ordersKey = "ordersAll";
-          }
-          
-          return entries
-            .map(([sku, data]) => ({
-              name: data.name,
-              pid: sku,
-              sku,
-              productType: getProductType(sku),
-              revenue: data[revenueKey],
-              orders: data[ordersKey],
-            }))
-            .sort((a, b) => b.orders - a.orders) // 주문수 기준 정렬
-            .slice(0, 10);
-        };
-
-        const productTop10ByPeriod = {
-          "1": { revenue: generateTop10ByRevenue(1), orders: generateTop10ByOrders(1) },
-          "7": { revenue: generateTop10ByRevenue(7), orders: generateTop10ByOrders(7) },
-          "30": { revenue: generateTop10ByRevenue(30), orders: generateTop10ByOrders(30) },
-          "90": { revenue: generateTop10ByRevenue(90), orders: generateTop10ByOrders(90) },
-          "all": { revenue: generateTop10ByRevenue(null), orders: generateTop10ByOrders(null) },
-        };
-
-        // 📊 이상감지: 모든 날짜별 전일 대비 변화율 계산
-        const calculateAnomaliesByDate = () => {
-          const rows = productDailyRows.slice(5);
-          if (rows.length < 2) return {};
-
-          const anomaliesByDate: Record<string, any> = {};
-
-          const codeRow = productDailyRows[2];
-          const nameRow = productDailyRows[3];
-
-          // 모든 인접한 두 행씩 비교 (i = 오늘, i-1 = 어제)
-          for (let i = 1; i < rows.length; i++) {
-            const todayRow = rows[i];
-            const yesterdayRow = rows[i - 1];
-            let todayDt = todayRow[0]?.trim() || "";
-
-            if (!todayDt) continue;
-
-            // todayDt 형식 표준화: "20260804" → "2026-08-04"
-            if (todayDt.length === 8 && !todayDt.includes('-')) {
-              todayDt = `${todayDt.substring(0, 4)}-${todayDt.substring(4, 6)}-${todayDt.substring(6, 8)}`;
-            }
-
-            const increases: any[] = [];
-            const decreases: any[] = [];
-
-            // D, G, J, M 등 3열씩 추출
-            let increasesCount = 0, decreasesCount = 0;
-            for (let colIdx = 3; colIdx < codeRow.length; colIdx += 3) {
-              const sku = codeRow[colIdx]?.trim();
-              if (!sku || sku === "") continue;
-
-              const name = nameRow[colIdx]?.trim() || sku;
-              const revenueColIdx = colIdx;
-
-              const yesterdayRevenue = parseFloat(yesterdayRow[revenueColIdx] || "0") || 0;
-              const todayRevenue = parseFloat(todayRow[revenueColIdx] || "0") || 0;
-
-              if (yesterdayRevenue === 0) continue;
-
-              const changePercent = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
-
-              const productType = getProductType(sku);
-              const displayName = `${name} ${productType}`.trim();
-
-              if (changePercent >= 10) {
-                increases.push({
-                  name: displayName,
-                  sku,
-                  yesterday: yesterdayRevenue,
-                  today: todayRevenue,
-                  changePercent,
-                });
-                increasesCount++;
-              } else if (changePercent <= -10) {
-                decreases.push({
-                  name: displayName,
-                  sku,
-                  yesterday: yesterdayRevenue,
-                  today: todayRevenue,
-                  changePercent,
-                });
-                decreasesCount++;
-              }
-            }
-
-            // 변화율 큰 순서대로 정렬
-            increases.sort((a, b) => b.changePercent - a.changePercent);
-            decreases.sort((a, b) => a.changePercent - b.changePercent);
-
-            if (i <= 3) {
-              console.log(`📊 [Calc] Row ${i} (${todayDt}): found +${increasesCount} -${decreasesCount}`);
-            }
-
-            anomaliesByDate[todayDt] = { increases, decreases };
-          }
-
-          return anomaliesByDate;
-        };
-
-        const anomaliesByDate = calculateAnomaliesByDate();
-        
-        // 로그: 각 날짜별 데이터 개수
-        const sampleDates = Object.keys(anomaliesByDate).slice(0, 5);
-        sampleDates.forEach(date => {
-          const data = anomaliesByDate[date];
-          console.log(`📊 ${date}: +${data.increases?.length || 0}, -${data.decreases?.length || 0}`);
-        });
-        console.log("📊 Anomalies by date - total dates:", Object.keys(anomaliesByDate).length);
-
-        // 📊 제품 목록 생성 (productDaily 시트의 Row 3, 4에서 추출)
-        console.log("📊 [useSheetData] productDailyRows length:", productDailyRows.length);
-        if (productDailyRows.length > 0) {
-          console.log("📊 [useSheetData] Row 0 (index 0, 처음 5개):", productDailyRows[0]?.slice(0, 5));
-          console.log("📊 [useSheetData] Row 1 (index 1, 처음 5개):", productDailyRows[1]?.slice(0, 5));
-          console.log("📊 [useSheetData] Row 2 (index 2, 처음 5개):", productDailyRows[2]?.slice(0, 5));
-          console.log("📊 [useSheetData] Row 3 (index 3, 처음 5개):", productDailyRows[3]?.slice(0, 5));
-        }
-
-        // productDailyRows에서 추출한 제품으로 덮어씌우기 (183줄의 let products 재사용)
-        products = []; // 초기화
-        if (productDailyRows.length > 3) {
-          const codeRow = productDailyRows[2]; // Row 3 (index 2): SKU
-          const nameRow = productDailyRows[3]; // Row 4 (index 3): 제품명
-
-          console.log("📊 [useSheetData] codeRow length:", codeRow?.length);
-          console.log("📊 [useSheetData] nameRow length:", nameRow?.length);
-
-          // D, G, J, M 등 3열씩 추출
-          for (let colIdx = 3; colIdx < (codeRow?.length || 0); colIdx += 3) {
-            const sku = codeRow?.[colIdx]?.trim();
-            if (!sku || sku === "") continue;
-
-            const name = nameRow?.[colIdx]?.trim() || sku;
-            const productType = getProductType(sku);
-            
-            console.log(`📊 [useSheetData] Found product at col ${colIdx}: SKU=${sku}, Name=${name}`);
-            
-            products.push({
-              name,
-              sku,
-              pid: sku, // SKU를 PID로 사용
-              productType,
-              totalRevenue: 0,
-              ordToday: 0,
-              ord7: 0,
-              ord30: 0,
-              ordThisMonth: 0,
-              smpThisMonth: 0,
-              newSojae: 0,
-              revSojae: 0,
-              dailySeries: [],
-            });
-          }
-        }
-
-        console.log("📊 [useSheetData] Extracted products count:", products.length);
-        if (products.length > 0) {
-          console.log("📊 [useSheetData] Sample products:", products.slice(0, 3));
-        }
+        console.log(
+          `📊 제품 ${productSheet.blocks.length}개 · 일별 ${productSheet.days.length}일 · 기준일 ${productSheet.latest}`
+        );
 
         setData({
           daily,
