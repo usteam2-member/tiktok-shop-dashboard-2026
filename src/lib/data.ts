@@ -53,6 +53,11 @@ export function dtToDate(dt: string): Date {
   return new Date(y, m, d);
 }
 
+// 전체 숫자 표시: 3039146664 → "3,039,146,664"
+export function fmtFull(n: number): string {
+  return Math.round(n).toLocaleString("ko-KR");
+}
+
 export function fmtKRW(n: number): string {
   if (n >= 1e12) return (n / 1e12).toFixed(1) + "T";
   if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";

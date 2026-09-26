@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
 
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
-const GID_DAILY = "0";
+const GID_DAILY = "1032420248"; // 매출 raw 시트 (J열 = 매출액 KRW)
 const GID_PRODUCT = "1578364048";
 const GID_SOJAE = "367495503";
 
@@ -92,7 +92,7 @@ function parseDailyData(rows: string[][]): DailyRow[] {
       aff: safeNum(row[4]),
       smp: safeNum(row[5]),
       ord: safeNum(row[6]),
-      krw: safeNum(row[8]),
+      krw: safeNum(row[9]), // J열: 매출액(KRW)
       adCost: safeNum(row[12]),
       roas: safeNum(row[16]),
       unitPriceUsd: safeNum(row[17]),

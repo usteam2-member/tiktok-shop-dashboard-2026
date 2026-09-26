@@ -149,13 +149,13 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
                     <div>
                       <div style={{ color: "#999", marginBottom: "4px" }}>어제</div>
                       <div style={{ fontWeight: 600, color: "#1f2937" }}>
-                        {(item.yesterday / 1e6).toFixed(1)}M
+                        ₩{Math.round(item.yesterday).toLocaleString("ko-KR")}
                       </div>
                     </div>
                     <div>
                       <div style={{ color: "#999", marginBottom: "4px" }}>오늘</div>
                       <div style={{ fontWeight: 600, color: "#059669" }}>
-                        {(item.today / 1e6).toFixed(1)}M
+                        ₩{Math.round(item.today).toLocaleString("ko-KR")}
                       </div>
                     </div>
                   </div>
@@ -241,13 +241,13 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
                     <div>
                       <div style={{ color: "#999", marginBottom: "4px" }}>어제</div>
                       <div style={{ fontWeight: 600, color: "#1f2937" }}>
-                        {(item.yesterday / 1e6).toFixed(1)}M
+                        ₩{Math.round(item.yesterday).toLocaleString("ko-KR")}
                       </div>
                     </div>
                     <div>
                       <div style={{ color: "#999", marginBottom: "4px" }}>오늘</div>
                       <div style={{ fontWeight: 600, color: "#dc2626" }}>
-                        {(item.today / 1e6).toFixed(1)}M
+                        ₩{Math.round(item.today).toLocaleString("ko-KR")}
                       </div>
                     </div>
                   </div>

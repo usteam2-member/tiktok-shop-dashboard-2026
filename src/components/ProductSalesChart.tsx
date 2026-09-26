@@ -73,9 +73,7 @@ export default function ProductSalesChart({ data, periodLabel }: Props) {
                 const val = context.parsed.x;
                 if (val === null || val === undefined) return "";
                 
-                if (val >= 1e6) return "매출액: " + (val / 1e6).toFixed(1) + "M";
-                if (val >= 1e3) return "매출액: " + (val / 1e3).toFixed(0) + "K";
-                return "매출액: " + val.toFixed(0);
+                return "매출액: ₩" + Math.round(val).toLocaleString("ko-KR");
               },
             },
           },

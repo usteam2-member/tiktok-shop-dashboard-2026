@@ -4,7 +4,6 @@ import { useRouter, usePathname } from "next/navigation";
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
   { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
-  { icon: "🎯", label: "주력 제품 KPI 트래킹", href: "/dashboard/kpi-tracking" },
 ];
 
 interface Props {
@@ -26,8 +25,6 @@ export default function TabBar({ activeTab }: Props) {
           // 더 구체적인 경로부터 확인 (순서 중요!)
           if (t.href === "/dashboard/products") {
             isActive = pathname === "/dashboard/products" || pathname.startsWith("/dashboard/products/");
-          } else if (t.href === "/dashboard/kpi-tracking") {
-            isActive = pathname === "/dashboard/kpi-tracking" || pathname.startsWith("/dashboard/kpi-tracking/");
           } else if (t.href === "/dashboard") {
             // /dashboard 정확히 (다른 것들과 겹치지 않게)
             isActive = pathname === "/dashboard";
