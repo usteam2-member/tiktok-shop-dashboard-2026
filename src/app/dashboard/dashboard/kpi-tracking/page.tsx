@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import styles from "./page.module.css";
+import Navbar from "@/components/Navbar";
+import TabBar from "@/components/TabBar";
 
 interface KpiItem {
   pid: string;
@@ -18,7 +20,7 @@ export default function KpiTrackingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/kpi")
+    fetch("/api/sheets/kpi")
       .then(r => r.json())
       .then(d => {
         const items: KpiItem[] = Object.entries(d.kpi || {}).map(([pid, data]: any) => {
@@ -63,10 +65,19 @@ export default function KpiTrackingPage() {
   const urgent = [...kpiData].sort((a, b) => a.avgRate - b.avgRate).slice(0, 5);
 
   if (loading) {
-    return <div className={styles.container}>로딩 중...</div>;
+    return (
+      <>
+        <Navbar startDate="" endDate="" />
+        <TabBar />
+        <div className={styles.container}>로딩 중...</div>
+      </>
+    );
   }
 
   return (
+    <>
+    <Navbar startDate="" endDate="" />
+    <TabBar />
     <div className={styles.container}>
       <h1 className={styles.title}>🎯 주력 제품 KPI 트래킹</h1>
 
@@ -125,6 +136,7 @@ export default function KpiTrackingPage() {
         </>
       )}
     </div>
+    </>
   );
 }
 
