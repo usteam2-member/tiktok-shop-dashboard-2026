@@ -270,7 +270,7 @@ function buildAnomalies(sheet: ProductSheet) {
     for (const b of sheet.blocks) {
       const y = safeNum(prev.row[b.col]);
       const t = safeNum(today.row[b.col]);
-      if (y === 0) continue;
+      if (y === 0 || t === 0) continue; // 어제 또는 오늘 매출이 0이면 제외 (±100% 같은 왜곡 방지)
       const changePercent = ((t - y) / y) * 100;
       const item = { name: `${b.name} ${getProductType(b.sku)}`.trim(), sku: b.sku, yesterday: y, today: t, changePercent };
       if (changePercent >= 10) increases.push(item);
