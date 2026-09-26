@@ -19,6 +19,11 @@ interface Props {
   availableDates: string[];
 }
 
+// 변화율 구간 라벨 (서로 겹치지 않음)
+function bandLabel(t: number): string {
+  return t >= 30 ? "30% 이상" : `${t}% 이상~${t + 10}% 미만`;
+}
+
 export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange, selectedDate, onDateChange, availableDates }: Props) {
   console.log("📊 [AnomalyDetection] Received:", {
     increasesCount: increases?.length || 0,
@@ -52,7 +57,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
                 transition: "all 0.2s",
               }}
             >
-              ±{t}%
+              {t >= 30 ? "30% 이상" : `${t}~${t + 10}%`}
             </button>
           ))}
         </div>
@@ -99,7 +104,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📈 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {threshold}% 이상 증가
+            📈 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {bandLabel(threshold)} 증가
             <span
               style={{
                 background: "#059669",
@@ -191,7 +196,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📉 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {threshold}% 이상 감소
+            📉 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {bandLabel(threshold)} 감소
             <span
               style={{
                 background: "#dc2626",

@@ -277,8 +277,11 @@ export default function DashboardPage() {
           {data && !loading && (
             <>
               {(() => {
-                const filteredIncreases = selectedDateAnomalies?.increases?.filter((item) => item.changePercent >= anomalyThreshold) || [];
-                const filteredDecreases = selectedDateAnomalies?.decreases?.filter((item) => Math.abs(item.changePercent) >= anomalyThreshold) || [];
+                // 구간 필터 (중복 없음): 10 → 10% 이상~20% 미만, 20 → 20% 이상~30% 미만, 30 → 30% 이상
+                const upper = anomalyThreshold >= 30 ? Infinity : anomalyThreshold + 10;
+                const inBand = (pct: number) => Math.abs(pct) >= anomalyThreshold && Math.abs(pct) < upper;
+                const filteredIncreases = selectedDateAnomalies?.increases?.filter((item) => inBand(item.changePercent)) || [];
+                const filteredDecreases = selectedDateAnomalies?.decreases?.filter((item) => inBand(item.changePercent)) || [];
                 
                 console.log("📊 [Dashboard] selectedDateAnomalies:", selectedDateAnomalies);
                 console.log("📊 [Dashboard] Original increases:", selectedDateAnomalies?.increases?.length || 0);
