@@ -4,6 +4,27 @@ import { Chart, registerables } from "chart.js";
 
 Chart.register(...registerables);
 
+// 각 막대 오른쪽 끝에 매출액 전체 숫자 표시 (예: ₩412,345,678)
+const barValueLabels = {
+  id: "barValueLabels",
+  afterDatasetsDraw(chart: Chart) {
+    const { ctx } = chart;
+    const meta = chart.getDatasetMeta(0);
+    const values = chart.data.datasets[0]?.data as number[];
+    ctx.save();
+    ctx.font = "600 11px sans-serif";
+    ctx.fillStyle = "#1f2937";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    meta.data.forEach((bar, i) => {
+      const v = values[i];
+      if (v === null || v === undefined) return;
+      ctx.fillText("₩" + Math.round(v).toLocaleString("ko-KR"), bar.x + 6, bar.y);
+    });
+    ctx.restore();
+  },
+};
+
 interface ProductSalesData {
   productName: string;
   sales: number;
@@ -38,6 +59,7 @@ export default function ProductSalesChart({ data, periodLabel, shopTotal }: Prop
 
     chartRef.current = new Chart(canvasRef.current, {
       type: "bar",
+      plugins: [barValueLabels],
       data: {
         labels,
         datasets: [
@@ -57,6 +79,7 @@ export default function ProductSalesChart({ data, periodLabel, shopTotal }: Prop
         indexAxis: "y" as const,
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { right: 110 } }, // 막대 옆 숫자가 잘리지 않도록 여백
         plugins: {
           legend: {
             display: true,
