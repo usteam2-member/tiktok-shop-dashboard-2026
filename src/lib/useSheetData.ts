@@ -277,8 +277,9 @@ function buildAnomalies(sheet: ProductSheet) {
       else if (changePercent <= -10) decreases.push(item);
     }
 
-    increases.sort((a, b) => b.changePercent - a.changePercent);
-    decreases.sort((a, b) => a.changePercent - b.changePercent);
+    // 오늘 매출이 큰 순서 (임계값 10/20/30% 필터 후에도 이 순서 유지)
+    increases.sort((a, b) => b.today - a.today);
+    decreases.sort((a, b) => b.today - a.today);
     byDate[today.date] = { increases, decreases }; // 키 형식: "2026-09-25"
   }
   return byDate;
