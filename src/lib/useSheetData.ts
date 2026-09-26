@@ -258,26 +258,28 @@ function buildTop10(sheet: ProductSheet) {
   return result;
 }
 
-function buildAnomalies(sheet: ProductSheet) {
+function buildAnomalies(pd: ProductDaily) {
   const byDate: Record<string, { increases: AnomalyItem[]; decreases: AnomalyItem[] }> = {};
 
-  for (let i = 1; i < sheet.days.length; i++) {
-    const prev = sheet.days[i - 1];
-    const today = sheet.days[i];
+  for (let i = 1; i < pd.days.length; i++) {
+    const prev = pd.days[i - 1];
+    const today = pd.days[i];
     const increases: AnomalyItem[] = [];
     const decreases: AnomalyItem[] = [];
 
-    for (const b of sheet.blocks) {
-      const y = safeNum(prev.row[b.col]);
-      const t = safeNum(today.row[b.col]);
-      if (y === 0 || t === 0) continue; // 어제 또는 오늘 매출이 0이면 제외 (±100% 같은 왜곡 방지)
-      const changePercent = ((t - y) / y) * 100;
-      const item = { name: `${b.name} ${getProductType(b.sku)}`.trim(), sku: b.sku, yesterday: y, today: t, changePercent };
+    // SKU별로 합산된 값 사용 → 같은 제품이 두 번 나오지 않음
+    pd.products.forEach((p, idx) => {
+      const y = prev.rev[idx];
+      const t = today.rev[idx];
+      if (y === 0 || t === 0) return; // 어제 또는 오늘 매출이 0이면 제외 (±100% 같은 왜곡 방지)
+      // 화면에 보이는 값(소수점 1자리)과 구간 판정 기준을 일치시킴 (예: 19.96% → 20.0%는 20~30% 구간)
+      const changePercent = Math.round(((t - y) / y) * 1000) / 10;
+      const item = { name: p.name, sku: p.sku, yesterday: y, today: t, changePercent };
       if (changePercent >= 10) increases.push(item);
       else if (changePercent <= -10) decreases.push(item);
-    }
+    });
 
-    // 오늘 매출이 큰 순서 (임계값 10/20/30% 필터 후에도 이 순서 유지)
+    // 오늘 매출이 큰 순서 (구간 필터 후에도 이 순서 유지)
     increases.sort((a, b) => b.today - a.today);
     decreases.sort((a, b) => b.today - a.today);
     byDate[today.date] = { increases, decreases }; // 키 형식: "2026-09-25"
@@ -390,8 +392,8 @@ export function useSheetData() {
         const productSheet = parseProductSheet(productDailyRows);
         const products = buildProducts(productSheet);
         const productTop10ByPeriod = buildTop10(productSheet);
-        const anomaliesByDate = buildAnomalies(productSheet);
         const productDaily = buildProductDaily(productSheet);
+        const anomaliesByDate = buildAnomalies(productDaily);
         const sojae = parseSojaeData(sojaeRows);
 
         console.log(
