@@ -1,4 +1,5 @@
 "use client";
+import { useRef } from "react";
 interface FilterBarProps {
   startDate: string;
   endDate: string;
@@ -17,6 +18,16 @@ export default function FilterBar({
   startDate, endDate, activeQuick,
   onStartChange, onEndChange, onQuick,
 }: FilterBarProps) {
+  const startRef = useRef<HTMLInputElement>(null);
+  // 설정 버튼: 기간을 이번 달로 맞춘 뒤 시작일 달력을 바로 열어줌
+  const handleClick = (days: number | null) => {
+    onQuick(days);
+    if (days === null) {
+      setTimeout(() => {
+        try { startRef.current?.showPicker(); } catch { startRef.current?.focus(); }
+      }, 50);
+    }
+  };
   const start = new Date(startDate);
   const end = new Date(endDate);
   const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
@@ -26,7 +37,7 @@ export default function FilterBar({
         {QUICK.map((q) => (
           <button
             key={q.label}
-            onClick={() => onQuick(q.days)}
+            onClick={() => handleClick(q.days)}
             style={{
               padding: "6px 12px",
               fontSize: "12px",
@@ -44,6 +55,7 @@ export default function FilterBar({
         ))}
         <div style={{ width: "1px", height: "20px", background: "var(--border)" }} />
         <input
+          ref={startRef}
           type="date"
           value={startDate}
           min="2026-01-01"

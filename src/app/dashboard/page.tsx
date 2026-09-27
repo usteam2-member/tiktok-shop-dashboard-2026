@@ -79,11 +79,12 @@ export default function DashboardPage() {
     const latestDate = dtToDate(lastDt);
     
     if (days === null) {
-      // 전체
-      setStartDate("2026-01-01");
+      // 설정: 최신 데이터가 있는 달의 1일 ~ 최신 날짜로 맞춤 → 달력이 이번 달부터 열림
+      const monthStart = fmt(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1));
+      setStartDate(monthStart);
       setEndDate(fmt(latestDate));
       setActiveQuick(null);
-      pushParams("2026-01-01", fmt(latestDate));
+      pushParams(monthStart, fmt(latestDate));
     } else {
       const startD = subtractDays(latestDate, days - 1);
       const s = fmt(startD);
