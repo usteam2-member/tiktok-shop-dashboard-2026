@@ -193,7 +193,7 @@ export default function DashboardPage() {
             transform: activeTab === "dashboard" ? "translateY(-2px)" : "translateY(0)",
           }}
         >
-          📊 대시보드
+          📊 기간별 매출
         </button>
         <button
           onClick={() => setActiveTab("anomaly")}
@@ -211,7 +211,7 @@ export default function DashboardPage() {
             transform: activeTab === "anomaly" ? "translateY(-2px)" : "translateY(0)",
           }}
         >
-          ⚠️ 이상감지
+          ⚠️ 급증/급감
         </button>
       </div>
 
