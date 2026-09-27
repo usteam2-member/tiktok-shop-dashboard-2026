@@ -91,11 +91,20 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
     const cnt = rows[i].filter(c => SKU_RE.test(c.trim())).length;
     if (cnt > best) { best = cnt; skuIdx = i; }
   }
+  // PID 행 = 라벨 행 위에서 15자리 이상 숫자(TikTok 상품 ID)가 가장 많은 행
+  const PID_RE = /^\d{15,}$/;
+  let pidIdx = -1; best = 0;
+  for (let i = 0; i < labelIdx; i++) {
+    const cnt = rows[i].filter(c => PID_RE.test(c.trim())).length;
+    if (cnt > best) { best = cnt; pidIdx = i; }
+  }
   const skuRow = skuIdx >= 0 ? rows[skuIdx] : [];
+  const pidRow = pidIdx >= 0 ? rows[pidIdx] : [];
   const nameRow = rows[labelIdx - 1] || [];
 
-  // 3) 제품 블록: "GMV" 열에서 시작, 이후 3칸 안에서 Ads spend / boosting 위치를 이름으로 찾음
-  interface Block { sku: string; name: string; gmv: number; ads: number; boost: number; }
+  // 3) 제품 블록 = 시트의 제품 칸 하나 (GMV | Ads spend | boosting | ROI)
+  //    같은 SKU라도 리스팅(PID)이 다르면 시트처럼 따로 보여줌. SKU가 비어 있는 칸도 포함.
+  interface Block { key: string; sku: string; name: string; gmv: number; ads: number; boost: number; }
   const blocks: Block[] = [];
   for (let c = 0; c < label.length; c++) {
     if (norm(label[c]) !== "gmv") continue;
@@ -106,21 +115,25 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
     const ads = find("adsspend");
     if (ads < 0) continue;
     const boost = find("boosting");
-    const sku = [0, 1, 2, 3].map(k => (skuRow[c + k] || "").trim()).find(v => SKU_RE.test(v)) || "";
-    if (!sku) continue;
-    const rawName = [0, 1, 2, 3].map(k => nameRow[c + k] || "").find(v => v.trim()) || sku;
+    const inBlock = (row: string[], re: RegExp) =>
+      [0, 1, 2, 3].map(k => (row[c + k] || "").trim()).find(v => re.test(v)) || "";
+    const sku = inBlock(skuRow, SKU_RE);
+    const pid = inBlock(pidRow, PID_RE);
+    const rawName = [0, 1, 2, 3].map(k => nameRow[c + k] || "").find(v => v.trim()) || sku || `열 ${c + 1}`;
     const name = rawName.split("\n")[0].trim();
-    blocks.push({ sku, name, gmv: c, ads, boost });
+    blocks.push({ key: pid || `col${c}`, sku, name, gmv: c, ads, boost });
   }
 
-  // 같은 SKU 블록은 합침
-  const products: GmaxProduct[] = [];
-  const idx: Record<string, number> = {};
-  for (const b of blocks) {
-    if (b.sku in idx) continue;
-    idx[b.sku] = products.length;
-    products.push({ sku: b.sku, name: `${b.name} ${getProductType(b.sku)}`.trim() });
-  }
+  // 블록마다 제품 하나. 이름이 겹치면 SKU / PID 끝자리로 구분
+  const products: GmaxProduct[] = blocks.map(b => ({ sku: b.sku, name: `${b.name} ${getProductType(b.sku)}`.trim() }));
+  const count: Record<string, number> = {};
+  products.forEach(p => { count[p.name] = (count[p.name] || 0) + 1; });
+  products.forEach((p, i) => {
+    if (count[p.name] > 1) {
+      const b = blocks[i];
+      p.name = `${p.name} · ${b.sku || ""}${b.key.startsWith("col") ? "" : " #" + b.key.slice(-4)}`.replace(/\s+/g, " ").trim();
+    }
+  });
 
   // 4) 날짜 행만 수집
   const seen = new Set<string>();
@@ -133,12 +146,11 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
     const gmv = new Array(products.length).fill(0);
     const ads = new Array(products.length).fill(0);
     const boost = new Array(products.length).fill(0);
-    for (const b of blocks) {
-      const p = idx[b.sku];
+    blocks.forEach((b, p) => {
       gmv[p] += num(r[b.gmv]);
       ads[p] += num(r[b.ads]);
       if (b.boost >= 0) boost[p] += num(r[b.boost]);
-    }
+    });
     days.push({ date, gmv, ads, boost });
   }
   days.sort((a, b) => a.date.localeCompare(b.date));

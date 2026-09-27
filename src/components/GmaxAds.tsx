@@ -39,11 +39,22 @@ const makeBarEndLabels = (rows: GmaxRow[]) => ({
     ctx.font = "600 11px sans-serif";
     ctx.fillStyle = "#1f2937";
     ctx.textBaseline = "middle";
+    const roiX = chart.width - 8; // ROI는 차트 맨 오른쪽에 오른쪽 정렬
+    // ROI 열 제목
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#64748b";
+    ctx.fillText("ROI", roiX, chart.chartArea.top - 10);
     rows.forEach((r, i) => {
       const x = Math.max(...metas.map(m => (m.data[i] as any)?.x ?? 0));
       const y = (metas[0].data[i] as any)?.y;
       if (y === undefined) return;
-      ctx.fillText(`${won(r.ads)} · ROI ${roiText(r.roi)}`, x + 6, y);
+      // 막대 바로 옆: Ads spend 금액
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#1f2937";
+      ctx.fillText(won(r.ads), x + 6, y);
+      // 맨 오른쪽: ROI
+      ctx.textAlign = "right";
+      ctx.fillText(roiText(r.roi), roiX, y);
     });
     ctx.restore();
   },
@@ -112,7 +123,7 @@ export default function GmaxAds() {
         animation: false,
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { right: 190 } },
+        layout: { padding: { right: 170, top: 18 } }, // 오른쪽: 금액 + ROI 열, 위: ROI 제목
         plugins: {
           legend: { position: "bottom", labels: { font: { size: 11 }, color: "#64748b", boxWidth: 12, boxHeight: 12 } },
           tooltip: {
@@ -271,7 +282,7 @@ export default function GmaxAds() {
           Ads spend Top 20 제품 ({mode === "daily" ? day : month.replace("-", "년 ") + "월"})
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
-          막대 전체 = Ads spend · 주황 = 그중 boosting · 오른쪽 숫자 = Ads spend · ROI
+          막대 전체 = Ads spend · 주황 = 그중 boosting · 막대 옆 = Ads spend 금액 · 맨 오른쪽 = ROI
         </div>
         {top20.length ? (
           <div style={{ position: "relative", height: Math.max(220, top20.length * 30 + 60) }}>
