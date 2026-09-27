@@ -5,6 +5,24 @@ import { DailyRow } from "@/lib/data";
 
 Chart.register(...registerables);
 
+// 여러 날을 하나로 합칠 때의 규칙
+//  - 매출·주문수·소재·샘플·광고비: 합계
+//  - ROAS: 합계 매출 ÷ 합계 광고비 (×100, %)
+//  - 객단가(USD): 합계 매출(USD) ÷ 합계 주문수
+function combine(dt: string, chunk: DailyRow[]): DailyRow {
+  const sum = (f: (r: DailyRow) => number) => chunk.reduce((a, r) => a + f(r), 0);
+  const krw = sum(r => r.krw), adCost = sum(r => r.adCost), ord = sum(r => r.ord);
+  const usd = sum(r => r.usd ?? r.unitPriceUsd * r.ord);
+  return {
+    dt,
+    krw, ord, adCost, usd,
+    smp: sum(r => r.smp),
+    aff: sum(r => r.aff),
+    roas: adCost > 0 ? (krw / adCost) * 100 : 0,
+    unitPriceUsd: ord > 0 ? usd / ord : 0,
+  };
+}
+
 interface Props {
   data: DailyRow[];
   activeQuick: number | null;
@@ -13,42 +31,17 @@ interface Props {
 
 function groupByMonth(rows: DailyRow[]): { labels: string[]; rows: DailyRow[] } {
   if (!rows.length) return { labels: [], rows: [] };
-
-  // 월별로 그룹화
   const monthMap: Record<string, DailyRow[]> = {};
-  
   for (const r of rows) {
-    const m = r.dt.slice(0, 4);  // "20260101" → "2026"
-    if (!monthMap[m]) monthMap[m] = [];
-    monthMap[m].push(r);
+    const m = r.dt.slice(0, 6); // "20260915" → "202609"
+    (monthMap[m] ||= []).push(r);
   }
-
   const labels: string[] = [];
   const resultRows: DailyRow[] = [];
-
-  // 월별로 정렬하여 처리
-  for (const [m, chunk] of Object.entries(monthMap).sort((a, b) => a[0].localeCompare(b[0]))) {
-    if (!chunk.length) continue;
-
-    // "2026" → "26/01", "26/02" 형식
-    const yy = m.slice(2, 4);
-    const mm = m.slice(4, 6);
-    labels.push(`${yy}/${mm}`);
-
-    // 월별 데이터 합계
-    const summedRow: DailyRow = {
-      dt: m + "01",
-      krw: chunk.reduce((sum, r) => sum + r.krw, 0),
-      ord: chunk.reduce((sum, r) => sum + r.ord, 0),
-      smp: chunk.reduce((sum, r) => sum + r.smp, 0),
-      aff: chunk.reduce((sum, r) => sum + r.aff, 0),
-      adCost: chunk.reduce((sum, r) => sum + r.adCost, 0),
-      roas: chunk.reduce((sum, r) => sum + r.roas, 0) / chunk.length,
-      unitPriceUsd: chunk.reduce((sum, r) => sum + r.unitPriceUsd, 0) / chunk.length,
-    };
-    resultRows.push(summedRow);
+  for (const [m, chunk] of Object.entries(monthMap).sort((x, y) => x[0].localeCompare(y[0]))) {
+    labels.push(`${parseInt(m.slice(4, 6))}월`);
+    resultRows.push(combine(m + "01", chunk));
   }
-
   return { labels, rows: resultRows };
 }
 
@@ -85,16 +78,7 @@ function sampleData(data: DailyRow[], activeQuick: number | null, isCustomRange:
       const dd = dt.slice(6, 8);
       labels.push(`${mm}/${dd}`);
 
-      const summedRow: DailyRow = {
-        dt: chunk[0].dt,
-        krw: chunk.reduce((a, r) => a + r.krw, 0),
-        ord: chunk.reduce((a, r) => a + r.ord, 0),
-        smp: chunk.reduce((a, r) => a + r.smp, 0),
-        aff: chunk.reduce((a, r) => a + r.aff, 0),
-        adCost: chunk.reduce((a, r) => a + r.adCost, 0),
-        roas: chunk.reduce((a, r) => a + r.roas, 0) / chunk.length,
-        unitPriceUsd: chunk.reduce((a, r) => a + r.unitPriceUsd, 0) / chunk.length,
-      };
+      const summedRow = combine(chunk[0].dt, chunk);
       sampled.push(summedRow);
     }
 
@@ -115,6 +99,7 @@ function getPeriodLabel(activeQuick: number | null, isCustomRange: boolean): str
 }
 
 function formatKRW(v: number): string {
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + "B";
   if (v >= 1e6) return (v / 1e6).toFixed(1) + "M";
   if (v >= 1e3) return (v / 1e3).toFixed(0) + "K";
   return v.toFixed(0);

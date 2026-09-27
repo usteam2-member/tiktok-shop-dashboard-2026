@@ -7,6 +7,7 @@ export interface DailyRow {
   adCost: number;
   roas: number;
   unitPriceUsd: number;
+  usd?: number; // 총 매출(USD) — 월별·구간 객단가 계산용
 }
 
 export interface ProductRow {

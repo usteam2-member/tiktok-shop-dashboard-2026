@@ -120,10 +120,11 @@ function parseDailyData(rows: string[][]): DailyRow[] {
       aff: safeNum(row[4]),
       smp: safeNum(row[5]),
       ord: safeNum(row[6]),
-      krw: safeNum(row[9]), // J열: 매출액(KRW)
-      adCost: safeNum(row[12]),
-      roas: safeNum(row[16]),
-      unitPriceUsd: safeNum(row[17]),
+      usd: safeNum(row[8]),     // I열: 총 매출(USD)
+      krw: safeNum(row[9]),     // J열: 총 매출(KRW)
+      adCost: safeNum(row[11]), // L열: Total ads spend (ROAS 계산 기준과 동일)
+      roas: safeNum(row[16]),   // Q열: ROAS (%)
+      unitPriceUsd: safeNum(row[18]), // S열: 객단가(USD)
     });
   }
 

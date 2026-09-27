@@ -1,5 +1,4 @@
 "use client";
-import { useRef } from "react";
 interface FilterBarProps {
   startDate: string;
   endDate: string;
@@ -7,27 +6,19 @@ interface FilterBarProps {
   onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
   onQuick: (days: number | null) => void;
+  isMonthly?: boolean; // 월별 보기 중인지 (직접 날짜를 고른 경우와 구분)
 }
 const QUICK = [
   { label: "7일", days: 7 },
   { label: "30일", days: 30 },
   { label: "90일", days: 90 },
-  { label: "설정", days: null },
+  { label: "월별", days: null },
 ];
 export default function FilterBar({
   startDate, endDate, activeQuick,
-  onStartChange, onEndChange, onQuick,
+  onStartChange, onEndChange, onQuick, isMonthly,
 }: FilterBarProps) {
-  const startRef = useRef<HTMLInputElement>(null);
-  // 설정 버튼: 기간을 이번 달로 맞춘 뒤 시작일 달력을 바로 열어줌
-  const handleClick = (days: number | null) => {
-    onQuick(days);
-    if (days === null) {
-      setTimeout(() => {
-        try { startRef.current?.showPicker(); } catch { startRef.current?.focus(); }
-      }, 50);
-    }
-  };
+  const isActive = (days: number | null) => (days === null ? !!isMonthly : activeQuick === days);
   const start = new Date(startDate);
   const end = new Date(endDate);
   const days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
@@ -37,13 +28,13 @@ export default function FilterBar({
         {QUICK.map((q) => (
           <button
             key={q.label}
-            onClick={() => handleClick(q.days)}
+            onClick={() => onQuick(q.days)}
             style={{
               padding: "6px 12px",
               fontSize: "12px",
-              fontWeight: activeQuick === q.days ? 600 : 400,
-              background: activeQuick === q.days ? "#1f2937" : "#f3f4f6",
-              color: activeQuick === q.days ? "white" : "#666",
+              fontWeight: isActive(q.days) ? 600 : 400,
+              background: isActive(q.days) ? "#1f2937" : "#f3f4f6",
+              color: isActive(q.days) ? "white" : "#666",
               border: "none",
               borderRadius: "4px",
               cursor: "pointer",
@@ -55,7 +46,6 @@ export default function FilterBar({
         ))}
         <div style={{ width: "1px", height: "20px", background: "var(--border)" }} />
         <input
-          ref={startRef}
           type="date"
           value={startDate}
           min="2026-01-01"
