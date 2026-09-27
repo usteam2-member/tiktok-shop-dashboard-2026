@@ -12,7 +12,12 @@ import { getProductType } from "./data";
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 export const GID_GMAX = "799909766";
 
-export interface GmaxProduct { sku: string; name: string; }
+export interface GmaxProduct {
+  sku: string;
+  name: string;      // 표시용 전체 이름 (예: "실펩토너 (단품)")
+  baseName: string;  // 구분 없이 제품명만 (예: "실펩토너")
+  type: string;      // "단품" | "번들" | "" (SKU로 판단)
+}
 
 export interface GmaxDay {
   date: string;     // "YYYY-MM-DD"
@@ -26,6 +31,8 @@ export interface GmaxData { products: GmaxProduct[]; days: GmaxDay[]; }
 export interface GmaxRow {
   sku: string;
   name: string;
+  baseName: string;
+  type: string;
   gmv: number;
   ads: number;          // Ads spend 전체 (boosting 포함)
   boost: number;        // 그중 boosting
@@ -125,13 +132,20 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
   }
 
   // 블록마다 제품 하나. 이름이 겹치면 SKU / PID 끝자리로 구분
-  const products: GmaxProduct[] = blocks.map(b => ({ sku: b.sku, name: `${b.name} ${getProductType(b.sku)}`.trim() }));
+  const products: GmaxProduct[] = blocks.map(b => ({
+    sku: b.sku,
+    baseName: b.name,
+    type: getProductType(b.sku).replace(/[()]/g, ""),
+    name: `${b.name} ${getProductType(b.sku)}`.trim(),
+  }));
   const count: Record<string, number> = {};
   products.forEach(p => { count[p.name] = (count[p.name] || 0) + 1; });
   products.forEach((p, i) => {
     if (count[p.name] > 1) {
       const b = blocks[i];
-      p.name = `${p.name} · ${b.sku || ""}${b.key.startsWith("col") ? "" : " #" + b.key.slice(-4)}`.replace(/\s+/g, " ").trim();
+      const tag = ` · ${b.sku || ""}${b.key.startsWith("col") ? "" : " #" + b.key.slice(-4)}`;
+      p.name = `${p.name}${tag}`.replace(/\s+/g, " ").trim();
+      p.baseName = `${p.baseName}${tag}`.replace(/\s+/g, " ").trim();
     }
   });
 

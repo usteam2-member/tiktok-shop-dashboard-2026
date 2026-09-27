@@ -37,7 +37,8 @@ export default function ProductTopTable({ startDate, endDate, shopTotal }: Props
       title="매출액 Top 10 제품"
       subtitle={`${startDate} ~ ${endDate} · Gmax 광고 시트 GMV 기준`}
       valueLabel="매출액"
-      rows={top.map(r => ({ name: r.name, roi: r.roi, value: r.gmv, hint: `Ads spend ${won(r.ads)}` }))}
+      showCategory
+      rows={top.map(r => ({ name: r.baseName, category: r.type, roi: r.roi, value: r.gmv, hint: `Ads spend ${won(r.ads)}` }))}
       summary={{
         label: "Top 10 매출 합계",
         value: sum,

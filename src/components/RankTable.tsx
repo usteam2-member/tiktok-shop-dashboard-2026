@@ -7,6 +7,7 @@ import React from "react";
 
 export interface RankRow {
   name: string;
+  category?: string;                                 // 구분 열 (단품 / 번들)
   roi: number | null;
   value: number;                                     // 금액 열 + 막대 길이
   segments?: { value: number; color: string }[];     // 막대를 나눠 칠할 때 (합 = value)
@@ -30,6 +31,7 @@ interface Props {
   summary?: RankSummary;
   footer?: React.ReactNode;
   emptyText?: string;
+  showCategory?: boolean;          // 제품명 다음에 '구분' 열 표시
 }
 
 export const won = (v: number) => "₩" + Math.round(v).toLocaleString("ko-KR");
@@ -56,9 +58,11 @@ function SummaryBox({ s }: { s: RankSummary }) {
   );
 }
 
-export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, footer, emptyText }: Props) {
+export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, footer, emptyText, showCategory }: Props) {
   const max = Math.max(1, ...rows.map(r => r.value));
-  const cols = "28px minmax(180px, 320px) 64px 140px minmax(120px, 1fr)";
+  const cols = showCategory
+    ? "28px minmax(180px, 300px) 56px 64px 140px minmax(120px, 1fr)"
+    : "28px minmax(180px, 320px) 64px 140px minmax(120px, 1fr)";
 
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: 20 }}>
@@ -89,6 +93,7 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "0 4px 8px", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>
               <div>#</div>
               <div>제품명</div>
+              {showCategory && <div style={{ textAlign: "center" }}>구분</div>}
               <div style={{ textAlign: "right" }}>ROI</div>
               <div style={{ textAlign: "right" }}>{valueLabel}</div>
               <div />
@@ -103,6 +108,17 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
                 >
                   <div style={{ fontSize: 12, fontWeight: 700, color: i < 3 ? ACCENT : "#94a3b8" }}>{i + 1}</div>
                   <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</div>
+                  {showCategory && (
+                    <div style={{ textAlign: "center" }}>
+                      {r.category ? (
+                        <span style={{
+                          display: "inline-block", fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 999,
+                          background: r.category === "번들" ? "#eef2ff" : "#f1f5f9",
+                          color: r.category === "번들" ? "#4338ca" : "#475569",
+                        }}>{r.category}</span>
+                      ) : <span style={{ fontSize: 12, color: "#cbd5e1" }}>-</span>}
+                    </div>
+                  )}
                   <div style={{ fontSize: 13, fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", color: r.roi === null ? "#94a3b8" : "#334155" }}>
                     {r.roi === null ? "-" : r.roi.toFixed(2)}
                   </div>
