@@ -1,14 +1,14 @@
 "use client";
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useSheetData, topProductsInRange } from "@/lib/useSheetData";
+import { useSheetData } from "@/lib/useSheetData";
 import { filterByRange, dtToDate } from "@/lib/data";
 import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
 import FilterBar from "@/components/FilterBar";
 import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
-import ProductSalesChart from "@/components/ProductSalesChart";
+import ProductTopTable from "@/components/ProductTopTable";
 import AnomalyDetection from "@/components/AnomalyDetection";
 import GmaxAds from "@/components/GmaxAds";
 
@@ -125,19 +125,8 @@ export default function DashboardPage() {
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
-  // 📊 매출 Top 10: 상단 KPI와 같은 기간(startDate~endDate)으로 집계
-  const productSalesData = useMemo(() => {
-    if (!data?.productDaily) return [];
-    return topProductsInRange(data.productDaily, startDate, endDate, 10).map(p => ({
-      productName: p.name,
-      sales: p.revenue,
-      orders: p.orders,
-    }));
-  }, [data, startDate, endDate]);
-
+  // 📊 매출 Top 10은 ProductTopTable이 Gmax 광고 시트에서 같은 기간으로 집계
   const shopTotal = useMemo(() => kpiData.reduce((a, r) => a + r.krw, 0), [kpiData]);
-
-  const periodLabel = `${startDate} ~ ${endDate}`;
 
   // 📊 이상감지용 available dates 계산 (최근 30일만)
   const availableDates = useMemo(() => {
@@ -266,13 +255,9 @@ export default function DashboardPage() {
                 <KpiRow data={kpiData} />
                 <DailyCharts data={chartData} activeQuick={activeQuick} isCustomRange={isCustomRange} />
                 
-                {/* 📊 매출액 Top 10 제품 차트 */}
+                {/* 📊 매출액 Top 10 제품 (제품명 | ROI | 매출액 | 막대) */}
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <ProductSalesChart 
-                    data={productSalesData} 
-                    periodLabel={periodLabel}
-                    shopTotal={shopTotal}
-                  />
+                  <ProductTopTable startDate={startDate} endDate={endDate} shopTotal={shopTotal} />
                 </div>
               </>
             )}

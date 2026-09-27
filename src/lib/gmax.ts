@@ -120,7 +120,7 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
     const sku = inBlock(skuRow, SKU_RE);
     const pid = inBlock(pidRow, PID_RE);
     const rawName = [0, 1, 2, 3].map(k => nameRow[c + k] || "").find(v => v.trim()) || sku || `열 ${c + 1}`;
-    const name = rawName.split("\n")[0].trim();
+    const name = rawName.split("\n")[0].replace(/\s+/g, " ").trim();
     blocks.push({ key: pid || `col${c}`, sku, name, gmv: c, ads, boost });
   }
 
@@ -163,11 +163,54 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
   return { products, days };
 }
 
-export async function fetchGmax(): Promise<GmaxData> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_GMAX}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Gmax 광고 시트를 불러오지 못했어요");
-  return parseGmaxSheet(parseCSVFull(await res.text()));
+// 한 페이지에서 여러 곳(Top 10, Gmax광고 탭)이 써도 시트는 한 번만 불러옴
+let gmaxPromise: Promise<GmaxData> | null = null;
+export function fetchGmax(): Promise<GmaxData> {
+  if (!gmaxPromise) {
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_GMAX}`;
+    gmaxPromise = fetch(url, { cache: "no-store" })
+      .then(res => {
+        if (!res.ok) throw new Error("Gmax 광고 시트를 불러오지 못했어요");
+        return res.text();
+      })
+      .then(text => parseGmaxSheet(parseCSVFull(text)))
+      .catch(e => { gmaxPromise = null; throw e; });
+  }
+  return gmaxPromise;
+}
+
+// 시트는 제품마다 입력 시점이 달라서, 최근 하루이틀은 일부 제품만 채워져 있을 수 있음.
+// "입력 완료된 날" = 그날 Ads spend 합계가 직전 7일 중앙값의 50% 이상인 날
+export function completeDates(data: GmaxData): Set<string> {
+  const totals = data.days.map(d => d.ads.reduce((a, b) => a + b, 0));
+  const ok = new Set<string>();
+  data.days.forEach((d, i) => {
+    const prev = totals.slice(Math.max(0, i - 7), i).filter(v => v > 0).sort((a, b) => a - b);
+    const median = prev.length ? prev[Math.floor(prev.length / 2)] : 0;
+    if (totals[i] > 0 && (median === 0 || totals[i] >= median * 0.5)) ok.add(d.date);
+  });
+  return ok;
+}
+
+export function lastCompleteDate(data: GmaxData): string {
+  const ok = completeDates(data);
+  for (let i = data.days.length - 1; i >= 0; i--) if (ok.has(data.days[i].date)) return data.days[i].date;
+  return data.days[data.days.length - 1]?.date || "";
+}
+
+// 기간(start~end, "YYYY-MM-DD") 제품별 합계. 정렬은 호출하는 쪽에서.
+export function aggregateGmaxRange(data: GmaxData, start: string, end: string): GmaxRow[] {
+  const rows = data.products.map(p => ({ ...p, gmv: 0, ads: 0, boost: 0 }));
+  for (const d of data.days) {
+    if ((start && d.date < start) || (end && d.date > end)) continue;
+    d.gmv.forEach((v, i) => { rows[i].gmv += v; });
+    d.ads.forEach((v, i) => { rows[i].ads += v; });
+    d.boost.forEach((v, i) => { rows[i].boost += v; });
+  }
+  return rows.map(r => {
+    const boost = Math.min(r.boost, r.ads);
+    return { ...r, boost, roi: r.ads > 0 ? r.gmv / r.ads : null, boostShare: r.ads > 0 ? boost / r.ads : 0 };
+  });
 }
 
 // period: "YYYY-MM-DD"(일별) 또는 "YYYY-MM"(월별) — 날짜가 이 값으로 시작하는 행을 합산

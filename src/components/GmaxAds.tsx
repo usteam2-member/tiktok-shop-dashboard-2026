@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
-import { fetchGmax, aggregateGmax, rankCorrelation, GmaxData, GmaxRow } from "@/lib/gmax";
+import { fetchGmax, aggregateGmax, rankCorrelation, lastCompleteDate, completeDates, GmaxData, GmaxRow } from "@/lib/gmax";
 
 Chart.register(...registerables);
 
@@ -71,7 +71,8 @@ export default function GmaxAds() {
     fetchGmax()
       .then(d => {
         setData(d);
-        const lastDate = d.days[d.days.length - 1]?.date || "";
+        // 기본 선택 = 모든 제품 입력이 끝난 가장 최근 날짜
+        const lastDate = lastCompleteDate(d);
         setDay(lastDate);
         setMonth(lastDate.slice(0, 7));
       })
@@ -79,6 +80,7 @@ export default function GmaxAds() {
   }, []);
 
   const dates = useMemo(() => (data ? data.days.map(d => d.date).reverse() : []), [data]);
+  const complete = useMemo(() => (data ? completeDates(data) : new Set<string>()), [data]);
   const months = useMemo(() => Array.from(new Set(dates.map(d => d.slice(0, 7)))), [dates]);
   const period = mode === "daily" ? day : month;
 
@@ -112,7 +114,7 @@ export default function GmaxAds() {
       type: "bar",
       plugins: [makeBarEndLabels(top20)],
       data: {
-        labels: top20.map(r => r.name),
+        labels: top20.map(r => (r.name.length > 24 ? r.name.slice(0, 23) + "…" : r.name)), // 긴 이름은 줄임 (툴팁엔 전체)
         datasets: [
           { label: "boosting", data: top20.map(r => r.boost), backgroundColor: C_BOOST, borderRadius: 0, borderSkipped: false, stack: "s" },
           { label: "광고비 (boosting 제외)", data: top20.map(r => r.ads - r.boost), backgroundColor: C_ADS, borderRadius: { topRight: 4, bottomRight: 4 } as any, borderSkipped: false, stack: "s" },
@@ -250,7 +252,7 @@ export default function GmaxAds() {
         <div style={{ width: 1, height: 24, background: "#d1d5db" }} />
         {mode === "daily" ? (
           <select value={day} onChange={e => setDay(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
-            {dates.map(d => <option key={d} value={d}>{d}</option>)}
+            {dates.map(d => <option key={d} value={d}>{d}{complete.has(d) ? "" : " (입력 중)"}</option>)}
           </select>
         ) : (
           <select value={month} onChange={e => setMonth(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
@@ -258,6 +260,9 @@ export default function GmaxAds() {
           </select>
         )}
         <span style={{ fontSize: 12, color: "#64748b" }}>광고비 집행 제품 {rows.length}개</span>
+        {mode === "daily" && day && !complete.has(day) && (
+          <span style={{ fontSize: 12, color: "#b45309" }}>⚠️ 이 날은 아직 일부 제품만 입력돼 있어요</span>
+        )}
       </div>
 
       {/* 요약 */}
