@@ -10,6 +10,7 @@ import KpiRow from "@/components/KpiRow";
 import DailyCharts from "@/components/DailyChart";
 import ProductSalesChart from "@/components/ProductSalesChart";
 import AnomalyDetection from "@/components/AnomalyDetection";
+import GmaxAds from "@/components/GmaxAds";
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -29,7 +30,7 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState(searchParams.get("start") || "");
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly" | "gmax">("dashboard");
   const [anomalyThreshold, setAnomalyThreshold] = useState<number>(10);
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState<string>("");
 
@@ -213,6 +214,24 @@ export default function DashboardPage() {
         >
           ⚠️ 급증/급감
         </button>
+        <button
+          onClick={() => setActiveTab("gmax")}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "8px",
+            border: "none",
+            background: activeTab === "gmax" ? "#3b82f6" : "#f3f4f6",
+            color: activeTab === "gmax" ? "white" : "#64748b",
+            fontWeight: activeTab === "gmax" ? 700 : 600,
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            boxShadow: activeTab === "gmax" ? "0 2px 8px rgba(59, 130, 246, 0.3)" : "none",
+            transform: activeTab === "gmax" ? "translateY(-2px)" : "translateY(0)",
+          }}
+        >
+          📣 Gmax광고
+        </button>
       </div>
 
       {/* 대시보드 탭 */}
@@ -303,6 +322,13 @@ export default function DashboardPage() {
               })()}
             </>
           )}
+        </main>
+      )}
+
+      {/* Gmax광고 탭 */}
+      {activeTab === "gmax" && (
+        <main style={{ flex: 1, padding: "20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+          <GmaxAds />
         </main>
       )}
     </div>
