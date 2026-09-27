@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
+import RankTable from "./RankTable";
 import { fetchGmax, aggregateGmax, rankCorrelation, lastCompleteDate, completeDates, GmaxData, GmaxRow } from "@/lib/gmax";
 
 Chart.register(...registerables);
@@ -27,38 +28,6 @@ const card: React.CSSProperties = {
   background: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px",
   padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "20px",
 };
-
-// 막대 오른쪽에 "₩광고비 · ROI x.xx" 표시
-const makeBarEndLabels = (rows: GmaxRow[]) => ({
-  id: "gmaxBarEndLabels",
-  afterDatasetsDraw(chart: Chart) {
-    const metas = chart.data.datasets.map((_, i) => chart.getDatasetMeta(i)).filter(m => !m.hidden);
-    if (!metas.length) return;
-    const { ctx } = chart;
-    ctx.save();
-    ctx.font = "600 11px sans-serif";
-    ctx.fillStyle = "#1f2937";
-    ctx.textBaseline = "middle";
-    const roiX = chart.width - 8; // ROI는 차트 맨 오른쪽에 오른쪽 정렬
-    // ROI 열 제목
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText("ROI", roiX, chart.chartArea.top - 10);
-    rows.forEach((r, i) => {
-      const x = Math.max(...metas.map(m => (m.data[i] as any)?.x ?? 0));
-      const y = (metas[0].data[i] as any)?.y;
-      if (y === undefined) return;
-      // 막대 바로 옆: Ads spend 금액
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#1f2937";
-      ctx.fillText(won(r.ads), x + 6, y);
-      // 맨 오른쪽: ROI
-      ctx.textAlign = "right";
-      ctx.fillText(roiText(r.roi), roiX, y);
-    });
-    ctx.restore();
-  },
-});
 
 export default function GmaxAds() {
   const [data, setData] = useState<GmaxData | null>(null);
@@ -103,55 +72,6 @@ export default function GmaxAds() {
       boostRoi: rankCorrelation(withRoi.map(r => r.boostShare), withRoi.map(r => r.roi as number)),
     };
   }, [rows]);
-
-  // ── 차트 1: Top 20 막대 (boosting + 그 외 광고비 = Ads spend) ──
-  const barRef = useRef<HTMLCanvasElement>(null);
-  const barChart = useRef<Chart | null>(null);
-  useEffect(() => {
-    barChart.current?.destroy();
-    if (!barRef.current || !top20.length) return;
-    barChart.current = new Chart(barRef.current, {
-      type: "bar",
-      plugins: [makeBarEndLabels(top20)],
-      data: {
-        labels: top20.map(r => (r.name.length > 24 ? r.name.slice(0, 23) + "…" : r.name)), // 긴 이름은 줄임 (툴팁엔 전체)
-        datasets: [
-          { label: "boosting", data: top20.map(r => r.boost), backgroundColor: C_BOOST, borderRadius: 0, borderSkipped: false, stack: "s" },
-          { label: "광고비 (boosting 제외)", data: top20.map(r => r.ads - r.boost), backgroundColor: C_ADS, borderRadius: { topRight: 4, bottomRight: 4 } as any, borderSkipped: false, stack: "s" },
-        ],
-      },
-      options: {
-        indexAxis: "y",
-        animation: false,
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: { right: 170, top: 18 } }, // 오른쪽: 금액 + ROI 열, 위: ROI 제목
-        plugins: {
-          legend: { position: "bottom", labels: { font: { size: 11 }, color: "#64748b", boxWidth: 12, boxHeight: 12 } },
-          tooltip: {
-            callbacks: {
-              title: (items: any[]) => top20[items[0].dataIndex].name,
-              label: () => "",
-              afterBody: (items: any[]) => {
-                const r = top20[items[0].dataIndex];
-                return [
-                  `Ads spend: ${won(r.ads)}`,
-                  `  └ boosting: ${won(r.boost)} (${(r.boostShare * 100).toFixed(1)}%)`,
-                  `GMV: ${won(r.gmv)}`,
-                  `ROI: ${roiText(r.roi)}`,
-                ];
-              },
-            },
-          },
-        },
-        scales: {
-          x: { stacked: true, beginAtZero: true, ticks: { color: "#64748b", font: { size: 10 }, callback: (v: any) => shortWon(v as number) }, grid: { color: "#e2e6ea", lineWidth: 0.5 } },
-          y: { stacked: true, ticks: { color: "#1f2937", font: { size: 11 } }, grid: { display: false } },
-        },
-      } as any,
-    });
-    return () => barChart.current?.destroy();
-  }, [top20]);
 
   // ── 차트 2: 상관관계 산점도 (x = Ads spend, y = ROI, 색 = boosting 비중) ──
   const scRef = useRef<HTMLCanvasElement>(null);
@@ -281,22 +201,31 @@ export default function GmaxAds() {
         ))}
       </div>
 
-      {/* Top 20 */}
-      <div style={card}>
-        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-          Ads spend Top 20 제품 ({mode === "daily" ? day : month.replace("-", "년 ") + "월"})
-        </div>
-        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
-          막대 전체 = Ads spend · 주황 = 그중 boosting · 막대 옆 = Ads spend 금액 · 맨 오른쪽 = ROI
-        </div>
-        {top20.length ? (
-          <div style={{ position: "relative", height: Math.max(220, top20.length * 30 + 60) }}>
-            <canvas ref={barRef} />
-          </div>
-        ) : (
-          <div style={{ padding: 40, textAlign: "center", color: "#999" }}>이 기간에 광고비 데이터가 없어요</div>
-        )}
-      </div>
+      {/* Top 20 — 메인 Top 10과 같은 표 형식 */}
+      <RankTable
+        title="Ads spend Top 20 제품"
+        subtitle={`${mode === "daily" ? day : month.replace("-", "년 ") + "월"} · 막대 전체 = Ads spend, 주황 = 그중 boosting`}
+        valueLabel="Ads spend"
+        legend={[{ label: "boosting", color: C_BOOST }, { label: "그 외 광고비", color: C_ADS }]}
+        rows={top20.map(r => ({
+          name: r.name,
+          roi: r.roi,
+          value: r.ads,
+          segments: [{ value: r.boost, color: C_BOOST }, { value: r.ads - r.boost, color: C_ADS }],
+          hint: `boosting ${won(r.boost)} (${(r.boostShare * 100).toFixed(1)}%) · GMV ${won(r.gmv)}`,
+        }))}
+        summary={{
+          label: "Top 20 Ads spend 합계",
+          value: top20.reduce((a, r) => a + r.ads, 0),
+          // 광고 집행 제품이 20여 개라 '전체 대비'는 거의 100%라서, 대신 boosting 비중을 보여줌
+          shareLabel: "그중 boosting 비중",
+          share: (() => {
+            const ads = top20.reduce((a, r) => a + r.ads, 0);
+            return ads > 0 ? (top20.reduce((a, r) => a + r.boost, 0) / ads) * 100 : null;
+          })(),
+        }}
+        emptyText="이 기간에 광고비 데이터가 없어요"
+      />
 
       {/* 상관관계 */}
       <div style={card}>
