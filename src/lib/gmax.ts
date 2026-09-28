@@ -13,6 +13,7 @@ const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 export const GID_GMAX = "799909766";
 
 export interface GmaxProduct {
+  pid: string;       // TikTok 상품 ID (시트 1행, 없으면 "")
   sku: string;
   name: string;      // 표시용 전체 이름 (예: "실펩토너 (단품)")
   baseName: string;  // 구분 없이 제품명만 (예: "실펩토너")
@@ -29,6 +30,7 @@ export interface GmaxDay {
 export interface GmaxData { products: GmaxProduct[]; days: GmaxDay[]; }
 
 export interface GmaxRow {
+  pid: string;
   sku: string;
   name: string;
   baseName: string;
@@ -98,12 +100,11 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
     const cnt = rows[i].filter(c => SKU_RE.test(c.trim())).length;
     if (cnt > best) { best = cnt; skuIdx = i; }
   }
-  // PID 행 = 라벨 행 위에서 15자리 이상 숫자(TikTok 상품 ID)가 가장 많은 행
+  // PID 행 = 1행 (상품 ID). 2행에도 긴 숫자(SKU ID)가 칸마다 반복돼 있어서 개수로 고르면 안 됨
   const PID_RE = /^\d{15,}$/;
-  let pidIdx = -1; best = 0;
-  for (let i = 0; i < labelIdx; i++) {
-    const cnt = rows[i].filter(c => PID_RE.test(c.trim())).length;
-    if (cnt > best) { best = cnt; pidIdx = i; }
+  let pidIdx = -1;
+  for (let i = 0; i < labelIdx && pidIdx < 0; i++) {
+    if (rows[i].some(c => PID_RE.test(c.trim()))) pidIdx = i;
   }
   const skuRow = skuIdx >= 0 ? rows[skuIdx] : [];
   const pidRow = pidIdx >= 0 ? rows[pidIdx] : [];
@@ -133,6 +134,7 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
 
   // 블록마다 제품 하나. 이름이 겹치면 SKU / PID 끝자리로 구분
   const products: GmaxProduct[] = blocks.map(b => ({
+    pid: b.key.startsWith("col") ? "" : b.key,
     sku: b.sku,
     baseName: b.name,
     type: getProductType(b.sku).replace(/[()]/g, ""),

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { fetchMonthSummaries, fetchProductMonthly, isOngoing, MonthSummary, ProductMonthly } from "@/lib/report";
+import { fetchGmax, aggregateGmaxRange, GmaxData } from "@/lib/gmax";
 
 const UP = "#15803d";
 const DOWN = "#9b2c2c";
@@ -45,11 +46,24 @@ const fmtShort = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Ma
 const C_PREV = "#8bb8e8";
 const C_CUR = "#1e4d8c";
 
-const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 110px";
+const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 100px 70px";
 const typeOf = (sku: string) => (sku.startsWith("BD") ? "번들" : sku.startsWith("SB") ? "단품" : "");
 
 // 제품별 매출: 선택 월 Top 10 × 전월 비교
-function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | null; cur: MonthSummary; prev?: MonthSummary; label: (m: MonthSummary) => string }) {
+// PID → 그 달 ROI (Gmax 광고 시트: 월 GMV 합 ÷ 월 Ads spend 합)
+function roiByPid(gmax: GmaxData | null, m?: MonthSummary): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!gmax || !m) return out;
+  for (const r of aggregateGmaxRange(gmax, `${m.key}-01`, `${m.key}-31`)) {
+    if (r.pid && r.roi !== null && !(r.pid in out)) out[r.pid] = r.roi;
+  }
+  return out;
+}
+
+function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly | null; gmax: GmaxData | null; cur: MonthSummary; prev?: MonthSummary; label: (m: MonthSummary) => string }) {
+  const roiCur = roiByPid(gmax, cur);
+  const roiPrev = roiByPid(gmax, prev);
+  const roiText = (v: number | undefined) => (v === undefined ? "-" : v.toFixed(2));
   if (!data) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>제품별 매출 불러오는 중...</div>;
   const curVals = data.revenue[cur.key];
   const prevVals = prev ? data.revenue[prev.key] : undefined;
@@ -86,6 +100,7 @@ function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | nul
           <div />
           <div style={{ textAlign: "right" }}>매출액</div>
           <div style={{ textAlign: "right" }}>증감</div>
+          <div style={{ textAlign: "right" }}>ROI</div>
         </div>
         {top.map((r, i) => {
           const pct = r.prev > 0 ? ((r.cur - r.prev) / r.prev) * 100 : null;
@@ -120,6 +135,11 @@ function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | nul
               <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                 {pct === null ? (prev ? "신규" : "-") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
               </div>
+              {/* ROI: 위 = 전월, 아래 = 선택 월 */}
+              <div style={{ fontSize: 13, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }} title="Gmax 광고 시트 기준 GMV ÷ Ads spend">
+                {prev && <div style={{ color: "#78716c" }}>{roiText(roiPrev[r.pid])}</div>}
+                <div style={{ color: "#1c1917", fontWeight: 700 }}>{roiText(roiCur[r.pid])}</div>
+              </div>
             </div>
           );
         })}
@@ -129,7 +149,7 @@ function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | nul
   );
 }
 
-function MonthlyMeeting({ months, products }: { months: MonthSummary[]; products: ProductMonthly | null }) {
+function MonthlyMeeting({ months, products, gmax }: { months: MonthSummary[]; products: ProductMonthly | null; gmax: GmaxData | null }) {
   const [key, setKey] = useState(months[months.length - 1]?.key || "");
   const idx = months.findIndex(m => m.key === key);
   const cur = months[idx];
@@ -184,7 +204,7 @@ function MonthlyMeeting({ months, products }: { months: MonthSummary[]; products
         출처: GMV | Daily 시트의 월별 &apos;마감 예상&apos; 행 · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
       </div>
 
-      <ProductCompare data={products} cur={cur} prev={prev} label={colLabel} />
+      <ProductCompare data={products} gmax={gmax} cur={cur} prev={prev} label={colLabel} />
     </div>
   );
 }
@@ -196,18 +216,20 @@ export default function Report() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("주요지표");
   const [products, setProducts] = useState<ProductMonthly | null>(null);
+  const [gmax, setGmax] = useState<GmaxData | null>(null);
 
   useEffect(() => {
     fetchMonthSummaries().then(setMonths).catch(e => setError(e.message));
     fetchProductMonthly().then(setProducts).catch(e => setError(e.message));
+    fetchGmax().then(setGmax).catch(() => setGmax(null)); // ROI는 없어도 나머지는 표시
   }, []);
 
   const body = useMemo(() => {
     if (error) return <div style={{ padding: 20, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {error}</div>;
     if (!months) return <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>보고 데이터 불러오는 중...</div>;
-    if (tab === "주요지표") return <MonthlyMeeting months={months} products={products} />;
+    if (tab === "주요지표") return <MonthlyMeeting months={months} products={products} gmax={gmax} />;
     return null;
-  }, [error, months, products, tab]);
+  }, [error, months, products, gmax, tab]);
 
   return (
     <div>
