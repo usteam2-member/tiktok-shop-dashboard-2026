@@ -167,12 +167,12 @@ function MonthlyMeeting({ months, products }: { months: MonthSummary[]; products
   );
 }
 
-const SUB_TABS = ["월례회의"] as const;
+const SUB_TABS = ["주요지표"] as const;
 
 export default function Report() {
   const [months, setMonths] = useState<MonthSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("월례회의");
+  const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("주요지표");
   const [products, setProducts] = useState<ProductMonthly | null>(null);
 
   useEffect(() => {
@@ -183,7 +183,7 @@ export default function Report() {
   const body = useMemo(() => {
     if (error) return <div style={{ padding: 20, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {error}</div>;
     if (!months) return <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>보고 데이터 불러오는 중...</div>;
-    if (tab === "월례회의") return <MonthlyMeeting months={months} products={products} />;
+    if (tab === "주요지표") return <MonthlyMeeting months={months} products={products} />;
     return null;
   }, [error, months, products, tab]);
 
