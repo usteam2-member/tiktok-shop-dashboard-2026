@@ -80,7 +80,20 @@ function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | nul
             <div key={r.pid || r.sku + i} style={{ display: "grid", gridTemplateColumns: "36px minmax(180px, 1.3fr) 32px minmax(160px, 2fr) 110px 110px", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
               <div style={{ fontSize: 16, color: "#78716c" }}>{i + 1}</div>
               <div>
-                <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
+                <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>
+                  {r.name}
+                  {/* 구분: SKU로 판단 (SB… = 단품, BD… = 번들) */}
+                  {(() => {
+                    const type = r.sku.startsWith("BD") ? "번들" : r.sku.startsWith("SB") ? "단품" : "";
+                    if (!type) return null;
+                    return (
+                      <span style={{
+                        display: "inline-block", marginLeft: 8, verticalAlign: 2, fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 999,
+                        background: type === "번들" ? "#eef2ff" : "#f1f5f9", color: type === "번들" ? "#4338ca" : "#475569",
+                      }}>{type}</span>
+                    );
+                  })()}
+                </div>
                 <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>{r.sku}</div>
               </div>
               <div style={{ fontSize: 11, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}>
