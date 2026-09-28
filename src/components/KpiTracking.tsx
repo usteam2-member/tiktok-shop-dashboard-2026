@@ -122,6 +122,15 @@ export default function KpiTracking() {
   // 'Order' 단계 위치 (담당자별 주문수 목표 총합용)
   const orderIdx = data.stages.findIndex(st => st.label.trim().toLowerCase() === "order");
 
+  // 화면 표시 순서: Order → Video posting → Sample order → Reach out (시트 순서와 반대)
+  const PREFERRED = ["order", "video posting", "sample order", "reach out"];
+  const rank = (label: string) => {
+    const i = PREFERRED.indexOf(label.trim().toLowerCase());
+    return i < 0 ? PREFERRED.length : i;
+  };
+  const display = data.stages.map((st, s) => ({ st, s })).sort((a, b) => rank(a.st.label) - rank(b.st.label) || a.s - b.s);
+  const title = (label: string) => label.charAt(0).toUpperCase() + label.slice(1); // reach out → Reach out
+
   // 담당자 목록: "상연, 채원" → 상연 / 채원 처럼 한 명씩
   const splitOwners = (o: string) => o.split(/[,/·&]+/).map(x => x.trim()).filter(Boolean);
   const owners = Array.from(new Set(rows.flatMap(r => splitOwners(r.owner))));
@@ -168,13 +177,13 @@ export default function KpiTracking() {
 
       {/* 단계별 요약 카드 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 16, marginBottom: 20 }}>
-        {data.stages.map((st, s) => {
+        {display.map(({ st, s }) => {
           const t = totals[s];
           const rate = t.eom !== null && t.kpi > 0 ? (t.eom / t.kpi) * 100 : null;
           return (
             <div key={st.key} style={{ ...card, padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>{s + 1}. {st.label}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>{title(st.label)}</div>
                 {rate !== null && <div style={{ fontSize: 12, fontWeight: 700, color: rate >= 100 ? GOOD : BAD }}>달성 예상 {rate.toFixed(0)}%</div>}
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 10 }}>
@@ -226,16 +235,16 @@ export default function KpiTracking() {
             <thead>
               <tr>
                 <th rowSpan={2} style={{ position: "sticky", left: 0, background: "#f8fafc", textAlign: "left", padding: "8px 12px 8px 20px", width: nameW, borderBottom: "1px solid var(--border)", fontSize: 11, color: "#64748b" }}>제품명</th>
-                {data.stages.map((st, s) => (
-                  <th key={st.key} colSpan={2} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "8px 6px 4px", fontSize: 12, fontWeight: 700, color: "#334155", borderLeft: "2px solid #fff" }}>
-                    {s + 1}. {st.label}
+                {display.map(({ st }, i) => (
+                  <th key={st.key} colSpan={2} style={{ background: i % 2 ? "#f8fafc" : "#eff6ff", padding: "8px 6px 4px", fontSize: 12, fontWeight: 700, color: "#334155", borderLeft: "2px solid #fff" }}>
+                    {title(st.label)}
                   </th>
                 ))}
               </tr>
               <tr>
-                {data.stages.map((st, s) =>
+                {display.map(({ st }, i) =>
                   sub.map((h, k) => (
-                    <th key={st.key + h} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "2px 12px 8px", textAlign: k === 0 ? "left" : "right", fontSize: 10, fontWeight: 600, color: "#64748b", width: k === 0 ? barW : deltaW, borderBottom: "1px solid var(--border)", borderLeft: k === 0 ? "2px solid #fff" : undefined }}>
+                    <th key={st.key + h} style={{ background: i % 2 ? "#f8fafc" : "#eff6ff", padding: "2px 12px 8px", textAlign: k === 0 ? "left" : "right", fontSize: 10, fontWeight: 600, color: "#64748b", width: k === 0 ? barW : deltaW, borderBottom: "1px solid var(--border)", borderLeft: k === 0 ? "2px solid #fff" : undefined }}>
                       {h}
                     </th>
                   )),
@@ -261,7 +270,7 @@ export default function KpiTracking() {
                         {r.name}
                         {sortByOrder && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>👤 {r.owner}</div>}
                       </td>
-                      {r.calc.map((c, s) => (
+                      {display.map(({ s }) => r.calc[s]).map((c, s) => (
                         <React.Fragment key={s}>
                           <td style={{ padding: "8px 16px 8px 12px", borderLeft: "2px solid #f1f5f9", width: barW }}>
                             <KpiBar kpi={c.kpi} today={c.today} eomV={c.eom} />
