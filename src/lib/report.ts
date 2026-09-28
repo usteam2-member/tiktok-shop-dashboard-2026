@@ -1,4 +1,4 @@
-// 보고 탭 데이터 — GMV | Daily 시트(gid 1032420248)의 월 요약 행
+// 보고 탭 데이터 — 지역별(미국·영국) GMV | Daily 시트의 월 요약 행
 //
 // 시트 구조: 달마다 일별 행 앞에 두 줄
 //   B열 "26년9월"  → 그 달 누적 실적
@@ -8,8 +8,23 @@
 import { parseCSVFull } from "./gmax";
 import { usToday } from "./kpi";
 
-const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
-const GID_DAILY = "1032420248";
+// 지역별 원본 시트 (둘 다 같은 양식)
+export interface ReportRegion { key: "us" | "uk"; label: string; flag: string; sheetId: string; dailyGid: string; productGid: string; }
+export const REGIONS: ReportRegion[] = [
+  { key: "us", label: "미국", flag: "🇺🇸", sheetId: "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", dailyGid: "1032420248", productGid: "1578364048" },
+  { key: "uk", label: "영국", flag: "🇬🇧", sheetId: "1uwrbiCPg7OG7N38ZlYfClHeVD0gBI7RIeWLzpH7_hak", dailyGid: "0", productGid: "1578364048" },
+];
+
+async function fetchCsv(sheetId: string, gid: string, what: string): Promise<string[][]> {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+  const res = await fetch(url, { cache: "no-store" });
+  const text = res.ok ? await res.text() : "";
+  // 비공개 시트는 로그인 HTML이 돌아옴
+  if (!res.ok || /^\s*<(!doctype|html)/i.test(text)) {
+    throw new Error(`${what} 시트를 불러오지 못했어요 (시트가 '링크가 있는 모든 사용자 보기'로 공유돼 있는지 확인해 주세요)`);
+  }
+  return parseCSVFull(text);
+}
 
 export interface MonthSummary {
   key: string;        // "2026-09"
@@ -31,6 +46,19 @@ function num(v: string | undefined): number | null {
 }
 
 export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
+  // 열 위치: 헤더 이름으로 찾고, 없으면 미국 시트 기본 위치 사용
+  const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "").toLowerCase();
+  const header = rows.slice(0, 15).find(r => r.some(c => norm(c) === "orders") && r.some(c => norm(c).startsWith("총매출"))) || [];
+  const col = (names: string[], fallback: number) => {
+    const i = header.findIndex(c => names.includes(norm(c)));
+    return i >= 0 ? i : fallback;
+  };
+  const C_ORD = col(["orders"], 6);
+  const C_REV = col(["총매출(krw)"], 9);
+  const C_GMVADS = col(["gmvads"], 12);
+  const C_BOOST = col(["creativeboost"], 13);
+  const C_AOV = col(["객단가(krw)"], 19);
+
   const out: MonthSummary[] = [];
   let cur: { year: number; month: number } | null = null;
   for (const r of rows) {
@@ -38,10 +66,10 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
     const m = b.match(/^(\d{2})년(\d{1,2})월$/);
     if (m) { cur = { year: 2000 + parseInt(m[1]), month: parseInt(m[2]) }; continue; }
     if (b === "마감예상" && cur) {
-      const revenue = num(r[9]), orders = num(r[6]);
+      const revenue = num(r[C_REV]), orders = num(r[C_ORD]);
       if (revenue === null || orders === null || revenue <= 0) { cur = null; continue; } // 아직 데이터 없는 달
-      const gmvAds = num(r[12]) ?? 0, boost = num(r[13]) ?? 0;
-      const aov = num(r[19]) ?? (orders > 0 ? revenue / orders : 0);
+      const gmvAds = num(r[C_GMVADS]) ?? 0, boost = num(r[C_BOOST]) ?? 0;
+      const aov = num(r[C_AOV]) ?? (orders > 0 ? revenue / orders : 0);
       out.push({
         key: `${cur.year}-${String(cur.month).padStart(2, "0")}`,
         year: cur.year, month: cur.month,
@@ -54,16 +82,14 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-let cache: Promise<MonthSummary[]> | null = null;
-export function fetchMonthSummaries(): Promise<MonthSummary[]> {
-  if (!cache) {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_DAILY}`;
-    cache = fetch(url, { cache: "no-store" })
-      .then(res => { if (!res.ok) throw new Error("매출 시트를 불러오지 못했어요"); return res.text(); })
-      .then(t => parseMonthSummaries(parseCSVFull(t)))
-      .catch(e => { cache = null; throw e; });
+const summaryCache: Record<string, Promise<MonthSummary[]>> = {};
+export function fetchMonthSummaries(region: ReportRegion = REGIONS[0]): Promise<MonthSummary[]> {
+  if (!summaryCache[region.key]) {
+    summaryCache[region.key] = fetchCsv(region.sheetId, region.dailyGid, `${region.label} 주요지표`)
+      .then(parseMonthSummaries)
+      .catch(e => { delete summaryCache[region.key]; throw e; });
   }
-  return cache;
+  return summaryCache[region.key];
 }
 
 // 진행 중인 달인지 (미국 날짜 기준)
@@ -77,7 +103,6 @@ export function isOngoing(m: { year: number; month: number }): boolean {
 //  1행 PID · SKU 행 · 제품명 행 · 라벨 행(매출액(KRW) | 주문수 | 샘플출고수)
 //  B열 "2609" 행(누적) 다음 줄 C열 "마감 예상" 행 = 그 달 마감(예상) 값  ← 이 값을 사용
 // ─────────────────────────────────────────────────────────────
-const GID_PRODUCT = "1578364048";
 
 export interface ProductInfo { pid: string; sku: string; name: string; }
 export interface ProductMonthly {
@@ -139,14 +164,12 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
   return { products, revenue };
 }
 
-let productCache: Promise<ProductMonthly> | null = null;
-export function fetchProductMonthly(): Promise<ProductMonthly> {
-  if (!productCache) {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_PRODUCT}`;
-    productCache = fetch(url, { cache: "no-store" })
-      .then(res => { if (!res.ok) throw new Error("제품별 매출 시트를 불러오지 못했어요"); return res.text(); })
-      .then(t => parseProductMonthly(parseCSVFull(t)))
-      .catch(e => { productCache = null; throw e; });
+const productCache: Record<string, Promise<ProductMonthly>> = {};
+export function fetchProductMonthly(region: ReportRegion = REGIONS[0]): Promise<ProductMonthly> {
+  if (!productCache[region.key]) {
+    productCache[region.key] = fetchCsv(region.sheetId, region.productGid, `${region.label} 제품별 매출`)
+      .then(parseProductMonthly)
+      .catch(e => { delete productCache[region.key]; throw e; });
   }
-  return productCache;
+  return productCache[region.key];
 }

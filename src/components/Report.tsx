@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { fetchMonthSummaries, fetchProductMonthly, isOngoing, MonthSummary, ProductMonthly } from "@/lib/report";
+import { fetchMonthSummaries, fetchProductMonthly, isOngoing, MonthSummary, ProductMonthly, REGIONS, ReportRegion } from "@/lib/report";
 import { fetchGmax, aggregateGmaxRange, GmaxData } from "@/lib/gmax";
 
 const UP = "#15803d";
@@ -149,30 +149,41 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
   );
 }
 
-function MonthlyMeeting({ months, products, gmax }: { months: MonthSummary[]; products: ProductMonthly | null; gmax: GmaxData | null }) {
-  const [key, setKey] = useState(months[months.length - 1]?.key || "");
-  const idx = months.findIndex(m => m.key === key);
-  const cur = months[idx];
-  const prev = idx > 0 ? months[idx - 1] : undefined;
+// 지역 하나의 데이터 상태
+interface RegionData {
+  region: ReportRegion;
+  months: MonthSummary[] | null;
+  products: ProductMonthly | null;
+  gmax: GmaxData | null;          // 제품별 ROI용 (미국만)
+  error: string | null;
+}
 
-  if (!cur) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>데이터가 없어요</div>;
+const prevKeyOf = (key: string) => {
+  const [y, m] = key.split("-").map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+};
+
+// 지역 한 곳: 주요 지표 표 + 제품별 매출
+function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
+  const title = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0 12px" }}>
+      <span>{d.region.flag}</span>{d.region.label}
+    </div>
+  );
+  if (d.error) return <div style={{ marginBottom: 36 }}>{title}<div style={{ padding: 16, background: "#fee2e2", color: "#991b1b", borderRadius: 8, fontSize: 13 }}>⚠️ {d.error}</div></div>;
+  if (!d.months) return <div style={{ marginBottom: 36 }}>{title}<div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>불러오는 중...</div></div>;
+
+  const cur = d.months.find(m => m.key === monthKey);
+  const prev = d.months.find(m => m.key === prevKeyOf(monthKey));
+  if (!cur) return <div style={{ marginBottom: 36 }}>{title}<div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>이 달의 데이터가 없어요</div></div>;
 
   const colLabel = (m: MonthSummary) => `${m.month}월 ${isOngoing(m) ? "마감예상" : "마감"}`;
   const th: React.CSSProperties = { padding: "14px 12px", fontSize: 13, fontWeight: 500, color: "#78716c", borderBottom: "1px solid #e7e5e4" };
   const td: React.CSSProperties = { padding: "18px 12px", fontSize: 15, borderBottom: "1px solid #e7e5e4", fontVariantNumeric: "tabular-nums" };
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>기준 월</span>
-        <select value={key} onChange={e => setKey(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
-          {[...months].reverse().map(m => (
-            <option key={m.key} value={m.key}>{m.year}년 {m.month}월</option>
-          ))}
-        </select>
-        {prev && <span style={{ fontSize: 12, color: "#94a3b8" }}>{prev.month}월과 비교</span>}
-      </div>
-
+    <div style={{ marginBottom: 44 }}>
+      {title}
       <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "4px 20px 8px", overflowX: "auto" }}>
         <table style={{ width: "100%", minWidth: 640, borderCollapse: "collapse" }}>
           <thead>
@@ -201,10 +212,35 @@ function MonthlyMeeting({ months, products, gmax }: { months: MonthSummary[]; pr
         </table>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: GMV | Daily 시트의 월별 &apos;마감 예상&apos; 행 · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
+        출처: {d.region.label} 시트 GMV | Daily의 월별 &apos;마감 예상&apos; 행 · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
       </div>
 
-      <ProductCompare data={products} gmax={gmax} cur={cur} prev={prev} label={colLabel} />
+      <ProductCompare data={d.products} gmax={d.gmax} cur={cur} prev={prev} label={colLabel} />
+    </div>
+  );
+}
+
+function MonthlyMeeting({ regions }: { regions: RegionData[] }) {
+  // 선택할 수 있는 달 = 어느 지역이든 데이터가 있는 달
+  const monthKeys = Array.from(new Set(regions.flatMap(r => (r.months || []).map(m => m.key)))).sort();
+  const [key, setKey] = useState("");
+  const selected = key || monthKeys[monthKeys.length - 1] || "";
+  const [y, m] = selected ? selected.split("-").map(Number) : [0, 0];
+  const [, pm] = selected ? prevKeyOf(selected).split("-").map(Number) : [0, 0];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>기준 월</span>
+        <select value={selected} onChange={e => setKey(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
+          {[...monthKeys].reverse().map(k => {
+            const [yy, mm] = k.split("-").map(Number);
+            return <option key={k} value={k}>{yy}년 {mm}월</option>;
+          })}
+        </select>
+        {selected && <span style={{ fontSize: 12, color: "#94a3b8" }}>{y}년 {m}월 · {pm}월과 비교</span>}
+      </div>
+      {regions.map(d => <RegionSection key={d.region.key} d={d} monthKey={selected} />)}
     </div>
   );
 }
@@ -212,24 +248,26 @@ function MonthlyMeeting({ months, products, gmax }: { months: MonthSummary[]; pr
 const SUB_TABS = ["주요지표"] as const;
 
 export default function Report() {
-  const [months, setMonths] = useState<MonthSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("주요지표");
-  const [products, setProducts] = useState<ProductMonthly | null>(null);
-  const [gmax, setGmax] = useState<GmaxData | null>(null);
+  const [regions, setRegions] = useState<RegionData[]>(
+    REGIONS.map(region => ({ region, months: null, products: null, gmax: null, error: null })),
+  );
 
   useEffect(() => {
-    fetchMonthSummaries().then(setMonths).catch(e => setError(e.message));
-    fetchProductMonthly().then(setProducts).catch(e => setError(e.message));
-    fetchGmax().then(setGmax).catch(() => setGmax(null)); // ROI는 없어도 나머지는 표시
+    const update = (key: string, patch: Partial<RegionData>) =>
+      setRegions(rs => rs.map(r => (r.region.key === key ? { ...r, ...patch } : r)));
+    for (const region of REGIONS) {
+      fetchMonthSummaries(region).then(months => update(region.key, { months })).catch(e => update(region.key, { error: e.message }));
+      fetchProductMonthly(region).then(products => update(region.key, { products })).catch(e => update(region.key, { error: e.message }));
+    }
+    // 제품별 ROI는 미국 Gmax 광고 시트만 있음
+    fetchGmax().then(gmax => update("us", { gmax })).catch(() => {});
   }, []);
 
   const body = useMemo(() => {
-    if (error) return <div style={{ padding: 20, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {error}</div>;
-    if (!months) return <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>보고 데이터 불러오는 중...</div>;
-    if (tab === "주요지표") return <MonthlyMeeting months={months} products={products} gmax={gmax} />;
+    if (tab === "주요지표") return <MonthlyMeeting regions={regions} />;
     return null;
-  }, [error, months, products, gmax, tab]);
+  }, [regions, tab]);
 
   return (
     <div>
