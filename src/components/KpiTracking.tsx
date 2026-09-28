@@ -20,16 +20,45 @@ function Delta({ v, size = 12 }: { v: number | null; size?: number }) {
   );
 }
 
-// 달성 막대: Today(진한 색) · EOM 예상(연한 색) · KPI 위치(세로선)
-function Bullet({ today, eomV, kpi, height = 6 }: { today: number; eomV: number | null; kpi: number | null; height?: number }) {
-  if (!kpi || kpi <= 0) return null;
-  const scale = Math.max(kpi, eomV ?? 0, today) * 1.05;
-  const pct = (v: number) => `${Math.min(100, (v / scale) * 100)}%`;
+// KPI 기준 막대: KPI를 항상 같은 위치(가로 2/3 지점)에 두고
+//  진한 파랑 = Today, 연한 파랑 = EOM 예상, 검은 눈금 = KPI(100%)
+//  KPI의 150%를 넘으면 오른쪽 끝에서 잘리고 ▸ 표시
+const KPI_POS = 2 / 3;
+function KpiBar({ kpi, today, eomV, height = 10, showKpi = true }: { kpi: number | null; today: number; eomV: number | null; height?: number; showKpi?: boolean }) {
+  const [hover, setHover] = useState(false);
+  const hasKpi = kpi !== null && kpi > 0;
+  const rate = (v: number | null) => (hasKpi && v !== null ? `${Math.round((v / (kpi as number)) * 100)}%` : "");
+  const w = (v: number) => `${Math.min(100, (v / (kpi as number)) * KPI_POS * 100)}%`;
+  const over = hasKpi && Math.max(today, eomV ?? 0) > (kpi as number) / KPI_POS;
+
   return (
-    <div style={{ position: "relative", height, background: "#f1f5f9", borderRadius: height / 2, marginTop: 4 }}>
-      {eomV !== null && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: pct(eomV), background: "#bfdbfe", borderRadius: height / 2 }} />}
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: pct(today), background: ACCENT, borderRadius: height / 2 }} />
-      <div style={{ position: "absolute", left: pct(kpi), top: -2, bottom: -2, width: 2, background: "#0f172a" }} />
+    <div style={{ position: "relative" }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      {showKpi && (
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 3 }}>
+          KPI <strong style={{ color: "#0f172a", fontSize: 12 }}>{hasKpi ? fmt(kpi) : "없음"}</strong>
+        </div>
+      )}
+      {hasKpi ? (
+        <div style={{ position: "relative", height, background: "#f1f5f9", borderRadius: 3, cursor: "default" }}>
+          {eomV !== null && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: w(eomV), background: "#bfdbfe", borderRadius: 3 }} />}
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: w(today), background: ACCENT, borderRadius: 3 }} />
+          <div style={{ position: "absolute", left: `${KPI_POS * 100}%`, top: -3, bottom: -3, width: 2, marginLeft: -1, background: "#0f172a" }} />
+          {over && <span style={{ position: "absolute", right: -9, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: ACCENT }}>▸</span>}
+        </div>
+      ) : (
+        <div style={{ fontSize: 11, color: "#94a3b8" }}>Today {fmt(today)} · EOM {fmt(eomV)}</div>
+      )}
+      {hover && (
+        <div style={{
+          position: "absolute", zIndex: 20, left: "50%", bottom: "calc(100% + 6px)", transform: "translateX(-50%)",
+          background: "#0f172a", color: "#fff", borderRadius: 6, padding: "8px 10px", fontSize: 12, lineHeight: 1.6,
+          whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(0,0,0,0.2)", pointerEvents: "none",
+        }}>
+          <div>KPI <strong>{hasKpi ? fmt(kpi) : "없음"}</strong></div>
+          <div><span style={{ display: "inline-block", width: 8, height: 8, background: ACCENT, borderRadius: 2, marginRight: 6 }} />Today <strong>{fmt(today)}</strong> {rate(today) && <span style={{ color: "#cbd5e1" }}>({rate(today)})</span>}</div>
+          <div><span style={{ display: "inline-block", width: 8, height: 8, background: "#bfdbfe", borderRadius: 2, marginRight: 6 }} />EOM 예상 <strong>{fmt(eomV)}</strong> {rate(eomV) && <span style={{ color: "#cbd5e1" }}>({rate(eomV)})</span>}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -81,9 +110,10 @@ export default function KpiTracking() {
   if (!month) return <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>KPI 데이터가 없어요</div>;
 
   const card: React.CSSProperties = { background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" };
-  const sub = ["KPI", "Today", "EOM 예상", "+/-"];
+  const sub = ["KPI 대비 Today · EOM 예상", "+/-"];
   const nameW = 230;
-  const cellW = 66;
+  const barW = 190;
+  const deltaW = 76;
 
   // 'Order' 단계 위치 (담당자별 주문수 목표 총합용)
   const orderIdx = data.stages.findIndex(st => st.label.trim().toLowerCase() === "order");
@@ -122,7 +152,7 @@ export default function KpiTracking() {
                 <span style={{ fontSize: 24, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{fmt(t.eom)}</span>
                 <span style={{ fontSize: 12, color: "#64748b" }}>EOM 예상 / KPI {fmt(t.kpi)}</span>
               </div>
-              <Bullet today={t.today} eomV={t.eom} kpi={t.kpi} height={8} />
+              <div style={{ marginTop: 6 }}><KpiBar kpi={t.kpi} today={t.today} eomV={t.eom} height={10} showKpi={false} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12, color: "#64748b" }}>
                 <span>Today <strong style={{ color: "#0f172a" }}>{fmt(t.today)}</strong></span>
                 <Delta v={t.delta} size={13} />
@@ -141,12 +171,12 @@ export default function KpiTracking() {
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: nameW + cellW * 4 * data.stages.length, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: nameW + (barW + deltaW) * data.stages.length, fontSize: 12, fontVariantNumeric: "tabular-nums" }}>
             <thead>
               <tr>
                 <th rowSpan={2} style={{ position: "sticky", left: 0, background: "#f8fafc", textAlign: "left", padding: "8px 12px 8px 20px", width: nameW, borderBottom: "1px solid var(--border)", fontSize: 11, color: "#64748b" }}>제품명</th>
                 {data.stages.map((st, s) => (
-                  <th key={st.key} colSpan={4} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "8px 6px 4px", fontSize: 12, fontWeight: 700, color: "#334155", borderLeft: "2px solid #fff" }}>
+                  <th key={st.key} colSpan={2} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "8px 6px 4px", fontSize: 12, fontWeight: 700, color: "#334155", borderLeft: "2px solid #fff" }}>
                     {s + 1}. {st.label}
                   </th>
                 ))}
@@ -154,7 +184,7 @@ export default function KpiTracking() {
               <tr>
                 {data.stages.map((st, s) =>
                   sub.map((h, k) => (
-                    <th key={st.key + h} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "2px 8px 8px", textAlign: "right", fontSize: 10, fontWeight: 600, color: "#64748b", width: cellW, borderBottom: "1px solid var(--border)", borderLeft: k === 0 ? "2px solid #fff" : undefined }}>
+                    <th key={st.key + h} style={{ background: s % 2 ? "#f8fafc" : "#eff6ff", padding: "2px 12px 8px", textAlign: k === 0 ? "left" : "right", fontSize: 10, fontWeight: 600, color: "#64748b", width: k === 0 ? barW : deltaW, borderBottom: "1px solid var(--border)", borderLeft: k === 0 ? "2px solid #fff" : undefined }}>
                       {h}
                     </th>
                   )),
@@ -181,13 +211,10 @@ export default function KpiTracking() {
                       </td>
                       {r.calc.map((c, s) => (
                         <React.Fragment key={s}>
-                          <td style={{ padding: "8px", textAlign: "right", color: "#64748b", borderLeft: "2px solid #f1f5f9" }}>{fmt(c.kpi)}</td>
-                          <td style={{ padding: "8px", textAlign: "right", color: "#0f172a" }}>{fmt(c.today)}</td>
-                          <td style={{ padding: "8px", textAlign: "right", fontWeight: 700, color: "#0f172a" }}>
-                            {fmt(c.eom)}
-                            <Bullet today={c.today} eomV={c.eom} kpi={c.kpi} height={4} />
+                          <td style={{ padding: "8px 16px 8px 12px", borderLeft: "2px solid #f1f5f9", width: barW }}>
+                            <KpiBar kpi={c.kpi} today={c.today} eomV={c.eom} />
                           </td>
-                          <td style={{ padding: "8px", textAlign: "right" }}><Delta v={c.delta} /></td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", width: deltaW }}><Delta v={c.delta} /></td>
                         </React.Fragment>
                       ))}
                     </tr>
