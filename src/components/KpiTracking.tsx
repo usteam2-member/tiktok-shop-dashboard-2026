@@ -66,6 +66,10 @@ function KpiBar({ kpi, today, eomV, height = 10, showKpi = true }: { kpi: number
 export default function KpiTracking() {
   const [data, setData] = useState<KpiData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 제품별 표 필터
+  const [ownerFilter, setOwnerFilter] = useState("전체");
+  const [query, setQuery] = useState("");
+  const [sortByOrder, setSortByOrder] = useState(false);
 
   useEffect(() => {
     fetchKpi()
@@ -118,13 +122,38 @@ export default function KpiTracking() {
   // 'Order' 단계 위치 (담당자별 주문수 목표 총합용)
   const orderIdx = data.stages.findIndex(st => st.label.trim().toLowerCase() === "order");
 
-  // 담당자별로 묶기
+  // 담당자 목록: "상연, 채원" → 상연 / 채원 처럼 한 명씩
+  const splitOwners = (o: string) => o.split(/[,/·&]+/).map(x => x.trim()).filter(Boolean);
+  const owners = Array.from(new Set(rows.flatMap(r => splitOwners(r.owner))));
+
+  // 필터: 담당자 + 제품명 (공백·대소문자 무시)
+  const q = query.replace(/\s+/g, "").toLowerCase();
+  const filtered = rows.filter(r =>
+    (ownerFilter === "전체" || splitOwners(r.owner).includes(ownerFilter)) &&
+    (!q || r.name.replace(/\s+/g, "").toLowerCase().includes(q)),
+  );
+
+  // 정렬: Order Today 높은 순 (켜면 담당자 묶음 없이 한 줄로)
+  const orderToday = (r: (typeof rows)[number]) => (orderIdx >= 0 ? r.calc[orderIdx].today : 0);
+  const visible = sortByOrder ? [...filtered].sort((a, b) => orderToday(b) - orderToday(a)) : filtered;
+
+  // 담당자별로 묶기 (정렬 중에는 묶지 않음)
   const groups: { owner: string; note: string; items: typeof rows }[] = [];
-  for (const r of rows) {
-    const g = groups[groups.length - 1];
-    if (g && g.owner === r.owner) g.items.push(r);
-    else groups.push({ owner: r.owner, note: r.ownerNote, items: [r] });
+  if (sortByOrder) {
+    if (visible.length) groups.push({ owner: "", note: "", items: visible });
+  } else {
+    for (const r of visible) {
+      const g = groups[groups.length - 1];
+      if (g && g.owner === r.owner) g.items.push(r);
+      else groups.push({ owner: r.owner, note: r.ownerNote, items: [r] });
+    }
   }
+
+  const chip = (active: boolean): React.CSSProperties => ({
+    padding: "5px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+    border: active ? "1px solid #1f2937" : "1px solid #e2e8f0",
+    background: active ? "#1f2937" : "#fff", color: active ? "#fff" : "#334155", fontWeight: active ? 700 : 500,
+  });
 
   return (
     <div>
@@ -165,9 +194,31 @@ export default function KpiTracking() {
 
       {/* 제품 × 단계 표 */}
       <div style={{ ...card, padding: 0 }}>
-        <div style={{ padding: "16px 20px 10px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>제품별 KPI 진행</div>
+        <div style={{ padding: "16px 20px 12px" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 12 }}>제품별 KPI 진행</div>
+
+          {/* 필터 바 */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginRight: 2 }}>담당자</span>
+              {["전체", ...owners].map(o => (
+                <button key={o} style={chip(ownerFilter === o)} onClick={() => setOwnerFilter(o)}>{o}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#64748b" }}>제품명</span>
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="예: 토너"
+                style={{ padding: "6px 10px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, width: 150 }}
+              />
+              {query && <button style={{ ...chip(false), padding: "5px 9px" }} onClick={() => setQuery("")}>✕</button>}
+            </div>
+            <button style={chip(sortByOrder)} onClick={() => setSortByOrder(v => !v)}>
+              {sortByOrder ? "✓ " : ""}Order 높은 순
+            </button>
+            <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: "auto" }}>{visible.length}개 제품 / 전체 {rows.length}개</span>
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -195,7 +246,7 @@ export default function KpiTracking() {
               {groups.map(g => (
                 <React.Fragment key={g.owner + g.items[0].name}>
                   <tr>
-                    <td colSpan={1 + 4 * data.stages.length} style={{ padding: "10px 20px 6px", background: "#fff", borderTop: "1px solid var(--border)" }}>
+                    <td colSpan={1 + 2 * data.stages.length} style={{ padding: "10px 20px 6px", background: "#fff", borderTop: "1px solid var(--border)", display: sortByOrder ? "none" : undefined }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>👤 {g.owner || "담당자 미지정"}</span>
                       {orderIdx >= 0 && (
                         <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c", marginLeft: 12 }}>
@@ -208,6 +259,7 @@ export default function KpiTracking() {
                     <tr key={r.pid + r.name} style={{ borderTop: "1px solid #f1f5f9" }}>
                       <td title={`${r.name}${r.pid ? ` · PID ${r.pid}` : ""}`} style={{ position: "sticky", left: 0, background: "var(--card)", padding: "8px 12px 8px 20px", maxWidth: nameW, lineHeight: 1.35, color: "#0f172a" }}>
                         {r.name}
+                        {sortByOrder && <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 2 }}>👤 {r.owner}</div>}
                       </td>
                       {r.calc.map((c, s) => (
                         <React.Fragment key={s}>
@@ -221,6 +273,9 @@ export default function KpiTracking() {
                   ))}
                 </React.Fragment>
               ))}
+              {visible.length === 0 && (
+                <tr><td colSpan={1 + 2 * data.stages.length} style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>조건에 맞는 제품이 없어요</td></tr>
+              )}
             </tbody>
           </table>
         </div>
