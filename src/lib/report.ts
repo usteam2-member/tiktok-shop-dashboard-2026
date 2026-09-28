@@ -48,7 +48,8 @@ function num(v: string | undefined): number | null {
 export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
   // 열 위치: 헤더 이름으로 찾고, 없으면 미국 시트 기본 위치 사용
   const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "").toLowerCase();
-  const header = rows.slice(0, 15).find(r => r.some(c => norm(c) === "orders") && r.some(c => norm(c).startsWith("총매출"))) || [];
+  // 헤더 행 = orders와 GMV ads가 함께 있는 행 (영국 시트는 매출 열 제목이 비어 있음)
+  const header = rows.slice(0, 15).find(r => r.some(c => norm(c) === "orders") && r.some(c => norm(c) === "gmvads")) || [];
   const col = (names: string[], fallback: number) => {
     const i = header.findIndex(c => names.includes(norm(c)));
     return i >= 0 ? i : fallback;
@@ -60,24 +61,29 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
   const C_AOV = col(["객단가(krw)"], 19);
 
   const out: MonthSummary[] = [];
-  let cur: { year: number; month: number } | null = null;
-  for (const r of rows) {
-    const b = (r[1] || "").replace(/\s/g, "");
+  const toSummary = (ym: { year: number; month: number }, r: string[]): MonthSummary | null => {
+    const revenue = num(r[C_REV]), orders = num(r[C_ORD]);
+    if (revenue === null || orders === null || revenue <= 0) return null; // 아직 데이터 없는 달
+    const gmvAds = num(r[C_GMVADS]) ?? 0, boost = num(r[C_BOOST]) ?? 0;
+    const aov = num(r[C_AOV]) ?? (orders > 0 ? revenue / orders : 0);
+    return {
+      key: `${ym.year}-${String(ym.month).padStart(2, "0")}`,
+      year: ym.year, month: ym.month,
+      revenue, orders, aov, gmvAds, boost,
+      roasTotal: gmvAds + boost > 0 ? revenue / (gmvAds + boost) : null,
+    };
+  };
+
+  // 월 행("26년9월") 바로 다음이 "마감 예상" 행이면 그 값을, 없으면 월 행 값을 사용
+  for (let i = 0; i < rows.length; i++) {
+    const b = (rows[i][1] || "").replace(/\s/g, "");
     const m = b.match(/^(\d{2})년(\d{1,2})월$/);
-    if (m) { cur = { year: 2000 + parseInt(m[1]), month: parseInt(m[2]) }; continue; }
-    if (b === "마감예상" && cur) {
-      const revenue = num(r[C_REV]), orders = num(r[C_ORD]);
-      if (revenue === null || orders === null || revenue <= 0) { cur = null; continue; } // 아직 데이터 없는 달
-      const gmvAds = num(r[C_GMVADS]) ?? 0, boost = num(r[C_BOOST]) ?? 0;
-      const aov = num(r[C_AOV]) ?? (orders > 0 ? revenue / orders : 0);
-      out.push({
-        key: `${cur.year}-${String(cur.month).padStart(2, "0")}`,
-        year: cur.year, month: cur.month,
-        revenue, orders, aov, gmvAds, boost,
-        roasTotal: gmvAds + boost > 0 ? revenue / (gmvAds + boost) : null,
-      });
-      cur = null;
-    }
+    if (!m) continue;
+    const ym = { year: 2000 + parseInt(m[1]), month: parseInt(m[2]) };
+    const next = rows[i + 1] || [];
+    const hasForecast = [0, 1, 2].some(k => (next[k] || "").replace(/\s/g, "") === "마감예상");
+    const s = (hasForecast && toSummary(ym, next)) || toSummary(ym, rows[i]);
+    if (s && !out.some(o => o.key === s.key)) out.push(s);
   }
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
@@ -128,8 +134,9 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     }
     return idx >= 0 ? rows[idx] : [];
   };
-  const skuRow = bestRow(/^(SB\d+_[A-Z]+|BD\d+)$/);
-  const pidRow = rows[0] || [];
+  const skuRow = bestRow(/^(SB\d+_[A-Z]+|BD\d+(_[A-Z]+)?)$/);
+  // PID 행 = 라벨 행 위에서 긴 숫자(상품 ID)가 처음 나오는 행 (미국 1행, 영국 2행)
+  const pidRow = rows.slice(0, labelIdx).find(r => r.some(v => /^\d{15,}$/.test(clean(v)))) || [];
   const nameRow = rows[labelIdx - 1] || [];
   const label = rows[labelIdx];
 
@@ -138,7 +145,7 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
   for (let c = 0; c < label.length; c++) {
     if (!label[c].includes("매출액(KRW)")) continue;
     const pid = /^\d{15,}$/.test(clean(pidRow[c])) ? clean(pidRow[c]) : "";
-    const sku = [0, 1, 2].map(k => clean(skuRow[c + k])).find(v => /^(SB\d+_[A-Z]+|BD\d+)$/.test(v)) || "";
+    const sku = [0, 1, 2].map(k => clean(skuRow[c + k])).find(v => /^(SB\d+_[A-Z]+|BD\d+(_[A-Z]+)?)$/.test(v)) || "";
     const name = (clean(nameRow[c]).split("\n")[0] || sku || `열 ${c + 1}`).replace(/\s+/g, " ").trim();
     if (!pid && !sku) continue;
     cols.push(c);
@@ -151,15 +158,19 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     return !t || t.startsWith("#") || isNaN(n) ? 0 : n;
   };
   const revenue: Record<string, number[]> = {};
-  for (let i = labelIdx + 1; i < rows.length - 1; i++) {
-    const b = clean(rows[i][1]);
+  for (let i = labelIdx + 1; i < rows.length; i++) {
+    // 월 행: 미국 "2609" / 영국 "26년9월"
+    const b0 = clean(rows[i][1]).replace(/\s/g, "");
+    const km = b0.match(/^(\d{2})년(\d{1,2})월$/);
+    const b = km ? `${km[1]}${km[2].padStart(2, "0")}` : b0;
     if (!/^\d{4}$/.test(b)) continue;
-    const next = rows[i + 1];
+    const next = rows[i + 1] || [];
     const isForecast = [0, 1, 2].some(k => clean(next[k]).replace(/\s/g, "") === "마감예상");
     const src = isForecast ? next : rows[i];
     const vals = cols.map(c => num(src[c]));
     if (vals.every(v => v === 0)) continue;
-    revenue[`20${b.slice(0, 2)}-${b.slice(2, 4)}`] = vals;
+    const mk = `20${b.slice(0, 2)}-${b.slice(2, 4)}`;
+    if (!(mk in revenue)) revenue[mk] = vals;
   }
   return { products, revenue };
 }
