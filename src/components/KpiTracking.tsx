@@ -85,6 +85,9 @@ export default function KpiTracking() {
   const nameW = 230;
   const cellW = 66;
 
+  // 'Order' 단계 위치 (담당자별 주문수 목표 총합용)
+  const orderIdx = data.stages.findIndex(st => st.label.trim().toLowerCase() === "order");
+
   // 담당자별로 묶기
   const groups: { owner: string; note: string; items: typeof rows }[] = [];
   for (const r of rows) {
@@ -98,11 +101,9 @@ export default function KpiTracking() {
       {/* 기준 안내 (필터 없음: 항상 당월 실시간) */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f9fafb", borderRadius: 8, marginBottom: 20 }}>
         <span style={{ fontSize: 14, fontWeight: 700 }}>{month.year}년 {month.month}월</span>
-        <span style={{ fontSize: 12, color: "#475569" }}>
-          기준일 미국 {today.month}/{today.day} · {elapsed}일 경과 / {daysInMonth}일
-        </span>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>
-          EOM 예상 = Today ÷ {elapsed}일 × {daysInMonth}일 · +/- = EOM 예상 − KPI
+        {/* 기준일 = 미국 오늘 − 1 (데이터가 채워진 날). 경과 일수 = 기준일 */}
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#b91c1c" }}>
+          {elapsed > 0 ? `기준일 : ${month.month}/${elapsed}일` : "기준일 : 이번 달 데이터 대기 중"}
         </span>
       </div>
 
@@ -136,8 +137,7 @@ export default function KpiTracking() {
       <div style={{ ...card, padding: 0 }}>
         <div style={{ padding: "16px 20px 10px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>제품별 KPI 진행 ({month.year}년 {month.month}월)</div>
-            <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>막대: 진한 파랑 = Today · 연한 파랑 = EOM 예상 · 검은 선 = KPI</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>제품별 KPI 진행</div>
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -167,7 +167,11 @@ export default function KpiTracking() {
                   <tr>
                     <td colSpan={1 + 4 * data.stages.length} style={{ padding: "10px 20px 6px", background: "#fff", borderTop: "1px solid var(--border)" }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>👤 {g.owner || "담당자 미지정"}</span>
-                      {g.note && <span style={{ fontSize: 11, color: "#94a3b8", marginLeft: 8 }}>{g.note}</span>}
+                      {orderIdx >= 0 && (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#b91c1c", marginLeft: 12 }}>
+                          주문수 목표 총합 : {fmt(g.items.reduce((a, r) => a + (r.calc[orderIdx].kpi ?? 0), 0))}
+                        </span>
+                      )}
                     </td>
                   </tr>
                   {g.items.map(r => (
