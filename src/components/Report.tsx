@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { fetchMonthSummaries, isOngoing, MonthSummary } from "@/lib/report";
+import { fetchMonthSummaries, fetchProductMonthly, isOngoing, MonthSummary, ProductMonthly } from "@/lib/report";
 
 const UP = "#15803d";
 const DOWN = "#9b2c2c";
@@ -40,7 +40,74 @@ function Change({ pct }: { pct: number | null }) {
   );
 }
 
-function MonthlyMeeting({ months }: { months: MonthSummary[] }) {
+// 금액: 1억 이상 "8.9억", 그 아래 "8,201만원"
+const fmtShort = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원`);
+const C_PREV = "#8bb8e8";
+const C_CUR = "#1e4d8c";
+
+// 제품별 매출: 선택 월 Top 10 × 전월 비교
+function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | null; cur: MonthSummary; prev?: MonthSummary; label: (m: MonthSummary) => string }) {
+  if (!data) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>제품별 매출 불러오는 중...</div>;
+  const curVals = data.revenue[cur.key];
+  const prevVals = prev ? data.revenue[prev.key] : undefined;
+  if (!curVals) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>{cur.month}월 제품별 매출이 없어요</div>;
+
+  const top = data.products
+    .map((p, i) => ({ ...p, cur: curVals[i] || 0, prev: prevVals?.[i] || 0 }))
+    .filter(r => r.cur > 0)
+    .sort((a, b) => b.cur - a.cur)
+    .slice(0, 10);
+  const max = Math.max(1, ...top.flatMap(r => [r.cur, r.prev]));
+  const bar = (v: number, color: string) => (
+    <div style={{ height: 14, width: `${Math.max(v > 0 ? 0.6 : 0, (v / max) * 100)}%`, minWidth: v > 0 ? 3 : 0, background: color, borderRadius: 3 }} />
+  );
+
+  return (
+    <div style={{ marginTop: 28 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#1c1917", marginBottom: 12 }}>제품별 매출</div>
+      <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 20px 6px" }}>
+        {/* 범례 */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 18, fontSize: 13, color: "#57534e", paddingBottom: 12, borderBottom: "1px solid #e7e5e4" }}>
+          {prev && <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_PREV }} />{label(prev)}</span>}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_CUR }} />{label(cur)}</span>
+          <span style={{ color: UP }}>↑ <span style={{ color: "#57534e" }}>증가</span></span>
+          <span style={{ color: DOWN }}>↓ <span style={{ color: "#57534e" }}>감소</span></span>
+        </div>
+
+        {top.map((r, i) => {
+          const pct = r.prev > 0 ? ((r.cur - r.prev) / r.prev) * 100 : null;
+          return (
+            <div key={r.pid || r.sku + i} style={{ display: "grid", gridTemplateColumns: "36px minmax(180px, 1.3fr) 32px minmax(160px, 2fr) 110px 110px", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
+              <div style={{ fontSize: 16, color: "#78716c" }}>{i + 1}</div>
+              <div>
+                <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
+                <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>{r.sku}</div>
+              </div>
+              <div style={{ fontSize: 11, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}>
+                {prev && <div>{prev.month}월</div>}
+                <div>{cur.month}월</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {prev && bar(r.prev, C_PREV)}
+                {bar(r.cur, C_CUR)}
+              </div>
+              <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                {prev && <div>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
+                <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.cur)}</div>
+              </div>
+              <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
+                {pct === null ? (prev ? "신규" : "-") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>출처: GMV | by Product 시트의 월별 &apos;마감 예상&apos; 행 · {cur.month}월 매출 Top 10 기준</div>
+    </div>
+  );
+}
+
+function MonthlyMeeting({ months, products }: { months: MonthSummary[]; products: ProductMonthly | null }) {
   const [key, setKey] = useState(months[months.length - 1]?.key || "");
   const idx = months.findIndex(m => m.key === key);
   const cur = months[idx];
@@ -94,6 +161,8 @@ function MonthlyMeeting({ months }: { months: MonthSummary[] }) {
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
         출처: GMV | Daily 시트의 월별 &apos;마감 예상&apos; 행 · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
       </div>
+
+      <ProductCompare data={products} cur={cur} prev={prev} label={colLabel} />
     </div>
   );
 }
@@ -104,17 +173,19 @@ export default function Report() {
   const [months, setMonths] = useState<MonthSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("월례회의");
+  const [products, setProducts] = useState<ProductMonthly | null>(null);
 
   useEffect(() => {
     fetchMonthSummaries().then(setMonths).catch(e => setError(e.message));
+    fetchProductMonthly().then(setProducts).catch(e => setError(e.message));
   }, []);
 
   const body = useMemo(() => {
     if (error) return <div style={{ padding: 20, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {error}</div>;
     if (!months) return <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>보고 데이터 불러오는 중...</div>;
-    if (tab === "월례회의") return <MonthlyMeeting months={months} />;
+    if (tab === "월례회의") return <MonthlyMeeting months={months} products={products} />;
     return null;
-  }, [error, months, tab]);
+  }, [error, months, products, tab]);
 
   return (
     <div>
