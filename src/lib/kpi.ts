@@ -46,28 +46,29 @@ function numOrNull(v: string | undefined): number | null {
 }
 
 export function parseKpiSheet(rows: string[][]): KpiData {
-  // 1) 헤더 행 = "EOM expected"가 가장 많은 행
+  // 1) 헤더 행 = "KPI" 바로 뒤에 "Today"가 오는 묶음이 가장 많은 행
+  //    (EOM expected 헤더는 비어 있을 수 있어서 기준으로 쓰지 않음)
+  const countGroups = (row: string[]) =>
+    row.reduce((n, c, i) => n + (low(c) === "kpi" && (low(row[i + 1]) === "today" || low(row[i + 2]) === "today") ? 1 : 0), 0);
   let h = -1, best = 0;
   for (let i = 0; i < Math.min(30, rows.length); i++) {
-    const cnt = rows[i].filter(c => low(c) === "eom expected").length;
+    const cnt = countGroups(rows[i]);
     if (cnt > best) { best = cnt; h = i; }
   }
   if (h < 0) return { stages: [], months: [] };
   const header = rows[h];
   const stageRow = rows[h - 1] || [];
 
-  // 2) 단계 = "KPI" 열에서 시작해 Today / EOM expected가 뒤따르는 묶음
+  // 2) 단계 = "KPI" + 바로 뒤 "Today" 열
   const colPid = header.findIndex(c => low(c) === "pid");
   const colName = header.findIndex(c => norm(c) === "제품명");
   const groups: { label: string; kpi: number; today: number }[] = [];
   for (let c = 0; c < header.length; c++) {
     if (low(header[c]) !== "kpi") continue;
-    const next = header.slice(c + 1, c + 6).map(low);
-    const t = next.indexOf("today");
-    const e = next.indexOf("eom expected");
-    if (t < 0 || e < 0) continue;
-    const raw = [0, 1, 2].map(k => norm(stageRow[c + k])).find(v => v) || `단계 ${groups.length + 1}`;
-    groups.push({ label: raw.replace(/^\d+\.\s*/, ""), kpi: c, today: c + 1 + t });
+    const t = low(header[c + 1]) === "today" ? c + 1 : low(header[c + 2]) === "today" ? c + 2 : -1;
+    if (t < 0) continue; // "히어로 KPI"처럼 Today가 없는 열은 제외
+    const raw = [0, 1, 2].map(k => norm(stageRow[c + k])).find(v => v && !/^\d+$/.test(v)) || `단계 ${groups.length + 1}`;
+    groups.push({ label: raw.replace(/^\d+\.\s*/, ""), kpi: c, today: t });
   }
   const stages = groups.map((g, i) => ({ key: `s${i}`, label: g.label }));
 
