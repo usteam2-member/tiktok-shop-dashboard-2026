@@ -108,13 +108,22 @@ export async function fetchKpi(): Promise<KpiData> {
   return parseKpiSheet(parseCSVFull(await res.text()));
 }
 
-// 경과 일수: 보는 날짜 − 1 (그 달이 지났으면 그 달 전체 일수)
-export function elapsedDays(year: number, month: number, now: Date) {
+// 기준 날짜 = 미국(태평양) 시간 오늘. TikTok Shop US 데이터가 미국 날짜로 쌓이기 때문
+// 예) 한국 9/28 오전 9시 = 미국 9/27 → 경과 일수 = 27 − 1 = 26일
+export function usToday(now: Date = new Date()): { year: number; month: number; day: number } {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit" })
+    .formatToParts(now);
+  const get = (t: string) => parseInt(parts.find(p => p.type === t)?.value || "0");
+  return { year: get("year"), month: get("month"), day: get("day") };
+}
+
+// 경과 일수: 기준 날짜 − 1 (그 달이 지났으면 그 달 전체 일수)
+export function elapsedDays(year: number, month: number, today = usToday()) {
   const daysInMonth = new Date(year, month, 0).getDate();
-  const ny = now.getFullYear(), nm = now.getMonth() + 1;
+  const { year: ny, month: nm, day } = today;
   if (ny > year || (ny === year && nm > month)) return { elapsed: daysInMonth, daysInMonth };
   if (ny < year || (ny === year && nm < month)) return { elapsed: 0, daysInMonth };
-  return { elapsed: Math.max(0, now.getDate() - 1), daysInMonth };
+  return { elapsed: Math.max(0, day - 1), daysInMonth };
 }
 
 export function eom(today: number, elapsed: number, daysInMonth: number): number | null {

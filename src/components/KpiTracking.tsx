@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchKpi, elapsedDays, eom, KpiData, KpiMonth } from "@/lib/kpi";
+import { fetchKpi, elapsedDays, eom, usToday, KpiData, KpiMonth } from "@/lib/kpi";
 
 const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "-" : Math.round(v).toLocaleString("ko-KR"));
 const GOOD = "#15803d";
@@ -37,17 +37,18 @@ function Bullet({ today, eomV, kpi, height = 6 }: { today: number; eomV: number 
 export default function KpiTracking() {
   const [data, setData] = useState<KpiData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [label, setLabel] = useState("");
 
   useEffect(() => {
     fetchKpi()
-      .then(d => { setData(d); setLabel(d.months[d.months.length - 1]?.label || ""); })
+      .then(setData)
       .catch(e => setError(e.message));
   }, []);
 
-  const month: KpiMonth | undefined = data?.months.find(m => m.label === label);
-  const now = new Date();
-  const { elapsed, daysInMonth } = month ? elapsedDays(month.year, month.month, now) : { elapsed: 0, daysInMonth: 30 };
+  // 항상 당월 블록 (없으면 시트의 가장 최근 월)
+  const today = usToday();
+  const month: KpiMonth | undefined =
+    data?.months.find(m => m.year === today.year && m.month === today.month) ?? data?.months[data.months.length - 1];
+  const { elapsed, daysInMonth } = month ? elapsedDays(month.year, month.month, today) : { elapsed: 0, daysInMonth: 30 };
 
   // 제품 × 단계별 계산값
   const rows = useMemo(() => {
@@ -94,16 +95,14 @@ export default function KpiTracking() {
 
   return (
     <div>
-      {/* 월 선택 + 계산 기준 */}
+      {/* 기준 안내 (필터 없음: 항상 당월 실시간) */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", padding: "12px 16px", background: "#f9fafb", borderRadius: 8, marginBottom: 20 }}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>기준 월</span>
-        <select value={label} onChange={e => setLabel(e.target.value)} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
-          {[...data.months].reverse().map(m => <option key={m.label} value={m.label}>{m.year}년 {m.month}월</option>)}
-        </select>
-        <span style={{ fontSize: 12, color: "#64748b" }}>
-          {elapsed >= daysInMonth
-            ? `마감된 달이라 EOM 예상 = Today`
-            : `EOM 예상 = Today ÷ ${elapsed}일(오늘−1) × ${daysInMonth}일 · +/- = EOM 예상 − KPI`}
+        <span style={{ fontSize: 14, fontWeight: 700 }}>{month.year}년 {month.month}월</span>
+        <span style={{ fontSize: 12, color: "#475569" }}>
+          기준일 미국 {today.month}/{today.day} · {elapsed}일 경과 / {daysInMonth}일
+        </span>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>
+          EOM 예상 = Today ÷ {elapsed}일 × {daysInMonth}일 · +/- = EOM 예상 − KPI
         </span>
       </div>
 
