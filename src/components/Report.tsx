@@ -45,6 +45,9 @@ const fmtShort = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Ma
 const C_PREV = "#8bb8e8";
 const C_CUR = "#1e4d8c";
 
+const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 110px";
+const typeOf = (sku: string) => (sku.startsWith("BD") ? "번들" : sku.startsWith("SB") ? "단품" : "");
+
 // 제품별 매출: 선택 월 Top 10 × 전월 비교
 function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | null; cur: MonthSummary; prev?: MonthSummary; label: (m: MonthSummary) => string }) {
   if (!data) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>제품별 매출 불러오는 중...</div>;
@@ -74,27 +77,33 @@ function ProductCompare({ data, cur, prev, label }: { data: ProductMonthly | nul
           <span style={{ color: DOWN }}>↓ <span style={{ color: "#57534e" }}>감소</span></span>
         </div>
 
+        {/* 열 제목 */}
+        <div style={{ display: "grid", gridTemplateColumns: GRID, gap: 12, padding: "12px 0 8px", borderBottom: "1px solid #e7e5e4", fontSize: 12, fontWeight: 500, color: "#a8a29e" }}>
+          <div>#</div>
+          <div>제품명</div>
+          <div style={{ textAlign: "center" }}>구분</div>
+          <div />
+          <div />
+          <div style={{ textAlign: "right" }}>매출액</div>
+          <div style={{ textAlign: "right" }}>증감</div>
+        </div>
         {top.map((r, i) => {
           const pct = r.prev > 0 ? ((r.cur - r.prev) / r.prev) * 100 : null;
           return (
-            <div key={r.pid || r.sku + i} style={{ display: "grid", gridTemplateColumns: "36px minmax(180px, 1.3fr) 32px minmax(160px, 2fr) 110px 110px", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
+            <div key={r.pid || r.sku + i} style={{ display: "grid", gridTemplateColumns: GRID, alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
               <div style={{ fontSize: 16, color: "#78716c" }}>{i + 1}</div>
               <div>
-                <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>
-                  {r.name}
-                  {/* 구분: SKU로 판단 (SB… = 단품, BD… = 번들) */}
-                  {(() => {
-                    const type = r.sku.startsWith("BD") ? "번들" : r.sku.startsWith("SB") ? "단품" : "";
-                    if (!type) return null;
-                    return (
-                      <span style={{
-                        display: "inline-block", marginLeft: 8, verticalAlign: 2, fontSize: 11, fontWeight: 600, padding: "1px 8px", borderRadius: 999,
-                        background: type === "번들" ? "#eef2ff" : "#f1f5f9", color: type === "번들" ? "#4338ca" : "#475569",
-                      }}>{type}</span>
-                    );
-                  })()}
-                </div>
+                <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
                 <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>{r.sku}</div>
+              </div>
+              {/* 구분 열: SKU로 판단 (SB… = 단품, BD… = 번들) */}
+              <div style={{ textAlign: "center" }}>
+                {typeOf(r.sku) ? (
+                  <span style={{
+                    display: "inline-block", fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 999,
+                    background: typeOf(r.sku) === "번들" ? "#eef2ff" : "#f1f5f9", color: typeOf(r.sku) === "번들" ? "#4338ca" : "#475569",
+                  }}>{typeOf(r.sku)}</span>
+                ) : <span style={{ color: "#cbd5e1" }}>-</span>}
               </div>
               <div style={{ fontSize: 11, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}>
                 {prev && <div>{prev.month}월</div>}
