@@ -11,6 +11,7 @@ import DailyCharts from "@/components/DailyChart";
 import ProductTopTable from "@/components/ProductTopTable";
 import AnomalyDetection from "@/components/AnomalyDetection";
 import GmaxAds from "@/components/GmaxAds";
+import KpiTracking from "@/components/KpiTracking";
 
 function fmt(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -30,7 +31,7 @@ export default function DashboardPage() {
   const [startDate, setStartDate] = useState(searchParams.get("start") || "");
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
   const [activeQuick, setActiveQuick] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly" | "gmax">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "anomaly" | "gmax" | "kpi">("dashboard");
   const [anomalyThreshold, setAnomalyThreshold] = useState<number>(10);
   const [selectedAnomalyDate, setSelectedAnomalyDate] = useState<string>("");
 
@@ -221,6 +222,24 @@ export default function DashboardPage() {
         >
           📣 Gmax광고
         </button>
+        <button
+          onClick={() => setActiveTab("kpi")}
+          style={{
+            padding: "8px 16px",
+            borderRadius: "8px",
+            border: "none",
+            background: activeTab === "kpi" ? "#3b82f6" : "#f3f4f6",
+            color: activeTab === "kpi" ? "white" : "#64748b",
+            fontWeight: activeTab === "kpi" ? 700 : 600,
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            boxShadow: activeTab === "kpi" ? "0 2px 8px rgba(59, 130, 246, 0.3)" : "none",
+            transform: activeTab === "kpi" ? "translateY(-2px)" : "translateY(0)",
+          }}
+        >
+          🎯 KPI 트랙킹
+        </button>
       </div>
 
       {/* 대시보드 탭 */}
@@ -308,6 +327,13 @@ export default function DashboardPage() {
               })()}
             </>
           )}
+        </main>
+      )}
+
+      {/* KPI 트랙킹 탭 */}
+      {activeTab === "kpi" && (
+        <main style={{ flex: 1, padding: "20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+          <KpiTracking />
         </main>
       )}
 
