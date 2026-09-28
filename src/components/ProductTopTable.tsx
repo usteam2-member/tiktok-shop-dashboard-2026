@@ -28,6 +28,8 @@ export default function ProductTopTable({ startDate, endDate, shopTotal }: Props
 
   const lastDate = useMemo(() => (data ? lastCompleteDate(data) : ""), [data]);
   const sum = top.reduce((a, r) => a + r.gmv, 0);
+  const sum5 = top.slice(0, 5).reduce((a, r) => a + r.gmv, 0);
+  const shareOf = (v: number) => (shopTotal && shopTotal > 0 ? (v / shopTotal) * 100 : null);
 
   if (error) return <div style={{ padding: 16, color: "#991b1b", background: "#fee2e2", borderRadius: 6 }}>⚠️ {error}</div>;
   if (!data) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>매출 Top 10 불러오는 중...</div>;
@@ -39,12 +41,10 @@ export default function ProductTopTable({ startDate, endDate, shopTotal }: Props
       valueLabel="매출액"
       showCategory
       rows={top.map(r => ({ name: r.baseName, category: r.type, roi: r.roi, value: r.gmv, hint: `Ads spend ${won(r.ads)}` }))}
-      summary={{
-        label: "Top 10 매출 합계",
-        value: sum,
-        shareLabel: "샵 전체 매출 대비",
-        share: shopTotal && shopTotal > 0 ? (sum / shopTotal) * 100 : null,
-      }}
+      summaries={[
+        { label: "Top 5 매출 합계", value: sum5, shareLabel: "샵 전체 매출 대비", share: shareOf(sum5) },
+        { label: "Top 10 매출 합계", value: sum, shareLabel: "샵 전체 매출 대비", share: shareOf(sum) },
+      ]}
       emptyText="이 기간에 매출 데이터가 없어요"
       footer={
         lastDate && endDate > lastDate

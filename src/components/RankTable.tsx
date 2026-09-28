@@ -29,6 +29,7 @@ interface Props {
   barColor?: string;
   legend?: { label: string; color: string }[];
   summary?: RankSummary;
+  summaries?: RankSummary[];       // 합계 + 비중을 한 카드에 담아 여러 개 표시 (예: Top 5 / Top 10)
   footer?: React.ReactNode;
   emptyText?: string;
   showCategory?: boolean;          // 제품명 다음에 '구분' 열 표시
@@ -36,6 +37,28 @@ interface Props {
 
 export const won = (v: number) => "₩" + Math.round(v).toLocaleString("ko-KR");
 const ACCENT = "#2a78d6";
+
+// 한 카드 = 합계 금액 + 비중 % + 비중 막대
+function SummaryCard({ s, strong }: { s: RankSummary; strong?: boolean }) {
+  const pct = s.share === null || s.share === undefined ? null : s.share;
+  return (
+    <div style={{ background: strong ? "#eff6ff" : "#f8fafc", border: `1px solid ${strong ? "#bfdbfe" : "#e2e8f0"}`, borderRadius: 10, padding: "10px 16px", minWidth: 220 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginBottom: 2 }}>{s.label}</div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{won(s.value)}</span>
+        {pct !== null && <span style={{ fontSize: 18, fontWeight: 800, color: ACCENT, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(1)}%</span>}
+      </div>
+      {pct !== null && (
+        <>
+          <div style={{ height: 6, background: "#dbeafe", borderRadius: 3, marginTop: 6 }}>
+            <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", background: ACCENT, borderRadius: 3 }} />
+          </div>
+          <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>{s.shareLabel}</div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function SummaryBox({ s }: { s: RankSummary }) {
   const pct = s.share === null || s.share === undefined ? null : s.share;
@@ -58,7 +81,7 @@ function SummaryBox({ s }: { s: RankSummary }) {
   );
 }
 
-export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, footer, emptyText, showCategory }: Props) {
+export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, summaries, footer, emptyText, showCategory }: Props) {
   const max = Math.max(1, ...rows.map(r => r.value));
   const cols = showCategory
     ? "28px minmax(180px, 300px) 56px 64px 140px minmax(120px, 1fr)"
@@ -83,6 +106,11 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
           )}
         </div>
         {summary && rows.length > 0 && <SummaryBox s={summary} />}
+        {summaries && rows.length > 0 && (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {summaries.map((s, i) => <SummaryCard key={s.label} s={s} strong={i === 0} />)}
+          </div>
+        )}
       </div>
 
       {rows.length === 0 ? (
