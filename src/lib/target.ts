@@ -7,6 +7,7 @@ import { ProductInfo } from "./report";
 
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 const GID_TARGET = "275604972";
+const LAST_ROW = 50; // 목표 표는 시트 50행까지 (그 아래는 다른 표)
 
 export interface TargetRow {
   owner: string;
@@ -37,7 +38,7 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
 
   const out: TargetRow[] = [];
   let blank = 0;
-  for (let i = h + 1; i < rows.length; i++) {
+  for (let i = h + 1; i < Math.min(rows.length, LAST_ROW); i++) {
     const r = rows[i];
     const name = (r[cName] || "").split("\n")[0].replace(/\s+/g, " ").trim();
     if (!name) { if (++blank >= 10) break; continue; } // 빈 줄이 이어지면 목표 표 끝

@@ -44,7 +44,11 @@ function Change({ pct }: { pct: number | null }) {
 }
 
 // 금액: 1억 이상 "8.9억", 그 아래 "8,201만원"
-const fmtShort = (v: number) => (v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : `${Math.round(v / 1e4).toLocaleString("ko-KR")}만원`);
+// 금액은 억 단위로 통일: 7천만원 → 0.7억 (0.1억 미만은 소수 둘째 자리, 예: 0.04억)
+const fmtShort = (v: number) => {
+  const e = v / 1e8;
+  return `${e >= 0.1 || e === 0 ? e.toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : e.toFixed(2)}억`;
+};
 const C_PREV = "#8bb8e8";
 const C_CUR = "#1e4d8c";
 
@@ -331,7 +335,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
                 <div>
                   <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
                   <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>
-                    {[r.sku, r.owner && `👤 ${r.owner}`].filter(Boolean).join(" · ")}
+                    {r.sku}
                     {r.via === "alias" && <span title="목표 시트에 참고 코드가 없어 이름으로 연결했어요" style={{ marginLeft: 6, color: "#b45309" }}>· 이름 연결</span>}
                   </div>
                 </div>
