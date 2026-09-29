@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchMonthSummaries, fetchProductMonthly, isOngoing, MonthSummary, ProductMonthly, REGIONS, ReportRegion } from "@/lib/report";
 import { fetchGmax, aggregateGmaxRange, GmaxData } from "@/lib/gmax";
+import { fetchTargets, matchProduct, TargetRow } from "@/lib/target";
+import { usToday } from "@/lib/kpi";
 
 const UP = "#15803d";
 const DOWN = "#9b2c2c";
@@ -245,7 +247,126 @@ function MonthlyMeeting({ regions }: { regions: RegionData[] }) {
   );
 }
 
-const SUB_TABS = ["주요지표"] as const;
+// ─────────────────────────────────────────────────────────────
+// 월 목표: 목표 월 매출 Top 10 × 전월 마감(예상) 매출 비교 (미국)
+//  목표 = 매출 목표 시트, 전월 = GMV | by Product 시트의 '마감 예상' 행
+// ─────────────────────────────────────────────────────────────
+function TargetCompare({ products }: { products: ProductMonthly | null }) {
+  const [targets, setTargets] = useState<{ rows: TargetRow[]; months: number[] } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [month, setMonth] = useState(0);
+  useEffect(() => { fetchTargets().then(setTargets).catch(e => setErr(e.message)); }, []);
+
+  if (err) return <div style={{ padding: 16, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {err}</div>;
+  if (!targets || !products) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>불러오는 중...</div>;
+
+  const today = usToday();
+  const available = targets.months.filter(m => targets.rows.some(r => (r.byMonth[m] || 0) > 0));
+  // 기본 = 다음 달 (없으면 목표가 있는 마지막 달)
+  const nextM = today.month === 12 ? 1 : today.month + 1;
+  const tm = month || (available.includes(nextM) ? nextM : available[available.length - 1]);
+  const pm = tm === 1 ? 12 : tm - 1;
+  const year = tm === 1 && today.month === 12 ? today.year + 1 : today.year;
+  const prevKey = `${pm === 12 && tm === 1 ? year - 1 : year}-${String(pm).padStart(2, "0")}`;
+  const prevVals = products.revenue[prevKey] || [];
+  const prevOngoing = isOngoing({ year: pm === 12 && tm === 1 ? year - 1 : year, month: pm });
+
+  const top = targets.rows
+    .filter(r => (r.byMonth[tm] || 0) > 0)
+    .sort((a, b) => b.byMonth[tm] - a.byMonth[tm])
+    .slice(0, 10)
+    .map(r => {
+      const m = matchProduct(r, products.products);
+      const prev = m.indices.length ? m.indices.reduce((a, i) => a + (prevVals[i] || 0), 0) : null;
+      const sku = r.sku || (m.indices.length ? products.products[m.indices[0]].sku : "");
+      return { ...r, sku, target: r.byMonth[tm], prev, via: m.via };
+    });
+  const max = Math.max(1, ...top.flatMap(r => [r.target, r.prev || 0]));
+  const sumT = top.reduce((a, r) => a + r.target, 0);
+  const sumP = top.reduce((a, r) => a + (r.prev || 0), 0);
+
+  // 금액 위에 막대
+  const cell = (v: number | null, color: string, bold?: boolean) => (
+    <div>
+      <div style={{ height: 10, background: "#f1f5f9", borderRadius: 3, marginBottom: 6 }}>
+        {v !== null && v > 0 && <div style={{ width: `${Math.max(1, (v / max) * 100)}%`, height: "100%", background: color, borderRadius: 3 }} />}
+      </div>
+      <div style={{ fontSize: 14, fontWeight: bold ? 700 : 500, color: bold ? "#1c1917" : "#57534e", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+        {v === null ? "-" : v > 0 ? fmtShort(v) : "0"}
+      </div>
+    </div>
+  );
+  const GRID_T = "32px minmax(200px, 1.4fr) 64px minmax(160px, 1.3fr) minmax(160px, 1.3fr) 96px";
+  const prevLabel = `${pm}월 ${prevOngoing ? "마감예상" : "마감"}`;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>목표 월</span>
+        <select value={tm} onChange={e => setMonth(Number(e.target.value))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
+          {available.map(m => <option key={m} value={m}>{m}월</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>🇺🇸 미국 · {tm}월 목표 매출 Top 10 × {prevLabel} 매출</span>
+      </div>
+
+      <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 20px 6px", overflowX: "auto" }}>
+        <div style={{ minWidth: 760 }}>
+          <div style={{ display: "flex", gap: 18, fontSize: 13, color: "#57534e", paddingBottom: 12, borderBottom: "1px solid #e7e5e4" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_PREV }} />{prevLabel}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_CUR }} />{tm}월 목표</span>
+          </div>
+          {/* 열 제목 */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, padding: "12px 0 8px", borderBottom: "1px solid #e7e5e4", fontSize: 12, color: "#a8a29e" }}>
+            <div>#</div><div>제품명</div><div style={{ textAlign: "center" }}>구분</div>
+            <div style={{ textAlign: "right" }}>{prevLabel}</div>
+            <div style={{ textAlign: "right" }}>{tm}월 목표</div>
+            <div style={{ textAlign: "right" }}>증감</div>
+          </div>
+          {top.map((r, i) => {
+            const pct = r.prev && r.prev > 0 ? ((r.target - r.prev) / r.prev) * 100 : null;
+            const type = typeOf(r.sku);
+            return (
+              <div key={r.name + i} style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, alignItems: "center", padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
+                <div style={{ fontSize: 16, color: "#78716c" }}>{i + 1}</div>
+                <div>
+                  <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
+                  <div style={{ fontSize: 12, color: "#a8a29e", marginTop: 2 }}>
+                    {[r.sku, r.owner && `👤 ${r.owner}`].filter(Boolean).join(" · ")}
+                    {r.via === "alias" && <span title="목표 시트에 참고 코드가 없어 이름으로 연결했어요" style={{ marginLeft: 6, color: "#b45309" }}>· 이름 연결</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  {type ? (
+                    <span style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 999, background: type === "번들" ? "#eef2ff" : "#f1f5f9", color: type === "번들" ? "#4338ca" : "#475569" }}>{type}</span>
+                  ) : <span style={{ color: "#cbd5e1" }}>-</span>}
+                </div>
+                {cell(r.prev, C_PREV)}
+                {cell(r.target, C_CUR, true)}
+                <div style={{ textAlign: "right", fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
+                  {pct === null ? (r.prev === null ? `${pm}월 없음` : "신규") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
+                </div>
+              </div>
+            );
+          })}
+          {/* 합계 */}
+          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, alignItems: "center", padding: "14px 0", borderTop: "2px solid #d6d3d1", fontWeight: 700 }}>
+            <div /><div style={{ fontSize: 14 }}>Top 10 합계</div><div />
+            <div style={{ textAlign: "right", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtShort(sumP)}</div>
+            <div style={{ textAlign: "right", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtShort(sumT)}</div>
+            <div style={{ textAlign: "right", fontSize: 15, color: sumP > 0 ? (sumT >= sumP ? UP : DOWN) : "#a8a29e" }}>
+              {sumP > 0 ? `${sumT >= sumP ? "↑" : "↓"} ${Math.abs(((sumT - sumP) / sumP) * 100).toFixed(1)}%` : "-"}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
+        출처: 목표 = 매출 목표 시트 &apos;{tm}월 매출&apos; 열 · {pm}월 = GMV | by Product 시트 &apos;마감 예상&apos; 행 · 참고 코드(SKU)로 연결하고, 코드가 없는 품목은 이름으로 연결(&apos;이름 연결&apos; 표시)
+      </div>
+    </div>
+  );
+}
+
+const SUB_TABS = ["주요지표", "월 목표"] as const;
 
 export default function Report() {
   const [tab, setTab] = useState<(typeof SUB_TABS)[number]>("주요지표");
@@ -266,6 +387,7 @@ export default function Report() {
 
   const body = useMemo(() => {
     if (tab === "주요지표") return <MonthlyMeeting regions={regions} />;
+    if (tab === "월 목표") return <TargetCompare products={regions.find(r => r.region.key === "us")?.products ?? null} />;
     return null;
   }, [regions, tab]);
 
