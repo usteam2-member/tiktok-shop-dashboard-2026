@@ -25,6 +25,14 @@ function bandLabel(t: number): string {
 }
 
 export default function AnomalyDetection({ increases, decreases, threshold, onThresholdChange, selectedDate, onDateChange, availableDates }: Props) {
+  // 비교 기준일 = 보고 있는 날짜(선택한 날짜, 없으면 최신 날짜)의 전날
+  const viewDate = selectedDate || availableDates[0] || "";
+  const baseDate = (() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(viewDate)) return "";
+    const [y, m, d] = viewDate.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  })();
+  const baseLabel = baseDate ? `${baseDate} 대비` : "전날 대비";
   console.log("📊 [AnomalyDetection] Received:", {
     increasesCount: increases?.length || 0,
     increases: increases?.map((d) => `${d.name}: +${d.changePercent.toFixed(1)}%`).slice(0, 3),
@@ -104,7 +112,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📈 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {bandLabel(threshold)} 증가
+            📈 {baseLabel} {bandLabel(threshold)} 증가
             <span
               style={{
                 background: "#059669",
@@ -196,7 +204,7 @@ export default function AnomalyDetection({ increases, decreases, threshold, onTh
               gap: "8px",
             }}
           >
-            📉 {selectedDate ? `${selectedDate} 대비` : "어제 대비"} {bandLabel(threshold)} 감소
+            📉 {baseLabel} {bandLabel(threshold)} 감소
             <span
               style={{
                 background: "#dc2626",
