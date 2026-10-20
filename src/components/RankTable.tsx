@@ -12,6 +12,7 @@ export interface RankRow {
   value: number;                                     // 금액 열 + 막대 길이
   segments?: { value: number; color: string }[];     // 막대를 나눠 칠할 때 (합 = value)
   hint?: string;                                     // 행에 마우스를 올리면 보이는 설명
+  extra?: string;                                    // 맨 오른쪽 추가 열 값 (예: 객단가)
 }
 
 export interface RankSummary {
@@ -33,6 +34,7 @@ interface Props {
   footer?: React.ReactNode;
   emptyText?: string;
   showCategory?: boolean;          // 제품명 다음에 '구분' 열 표시
+  extraLabel?: string;             // 맨 오른쪽 추가 열 제목 (있을 때만 열 표시)
 }
 
 export const won = (v: number) => "₩" + Math.round(v).toLocaleString("ko-KR");
@@ -81,11 +83,11 @@ function SummaryBox({ s }: { s: RankSummary }) {
   );
 }
 
-export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, summaries, footer, emptyText, showCategory }: Props) {
+export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, summaries, footer, emptyText, showCategory, extraLabel }: Props) {
   const max = Math.max(1, ...rows.map(r => r.value));
-  const cols = showCategory
+  const cols = (showCategory
     ? "28px minmax(180px, 300px) 56px 64px 140px minmax(120px, 1fr)"
-    : "28px minmax(180px, 320px) 64px 140px minmax(120px, 1fr)";
+    : "28px minmax(180px, 320px) 64px 140px minmax(120px, 1fr)") + (extraLabel ? " 80px" : "");
 
   return (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: 20 }}>
@@ -117,7 +119,7 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
         <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>{emptyText || "데이터가 없어요"}</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 560 }}>
+          <div style={{ minWidth: extraLabel ? 660 : 560 }}>
             <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "0 4px 8px", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 600, color: "var(--muted)" }}>
               <div>#</div>
               <div>제품명</div>
@@ -125,6 +127,7 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
               <div style={{ textAlign: "right" }}>ROI</div>
               <div style={{ textAlign: "right" }}>{valueLabel}</div>
               <div />
+              {extraLabel && <div style={{ textAlign: "right" }}>{extraLabel}</div>}
             </div>
             {rows.map((r, i) => {
               const segs = r.segments && r.segments.length ? r.segments : [{ value: r.value, color: barColor }];
@@ -158,6 +161,11 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
                       ))}
                     </div>
                   </div>
+                  {extraLabel && (
+                    <div style={{ fontSize: 13, fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", color: r.extra ? "#334155" : "#94a3b8" }}>
+                      {r.extra || "-"}
+                    </div>
+                  )}
                 </div>
               );
             })}

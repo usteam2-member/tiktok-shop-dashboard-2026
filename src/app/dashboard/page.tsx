@@ -128,6 +128,11 @@ export default function DashboardPage() {
 
   // 📊 매출 Top 10은 ProductTopTable이 Gmax 광고 시트에서 같은 기간으로 집계
   const shopTotal = useMemo(() => kpiData.reduce((a, r) => a + r.krw, 0), [kpiData]);
+  // 객단가 달러 환산용 환율 = 같은 기간 총 매출(KRW) ÷ 총 매출(USD)
+  const fxRate = useMemo(() => {
+    const usd = kpiData.reduce((a, r) => a + (r.usd || 0), 0);
+    return usd > 0 ? shopTotal / usd : undefined;
+  }, [kpiData, shopTotal]);
 
   // 📊 이상감지용 available dates 계산 (최근 30일만)
   const availableDates = useMemo(() => {
@@ -295,7 +300,7 @@ export default function DashboardPage() {
                 
                 {/* 📊 매출액 Top 10 제품 (제품명 | ROI | 매출액 | 막대) */}
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <ProductTopTable startDate={startDate} endDate={endDate} shopTotal={shopTotal} />
+                  <ProductTopTable startDate={startDate} endDate={endDate} shopTotal={shopTotal} fxRate={fxRate} />
                 </div>
               </>
             )}
