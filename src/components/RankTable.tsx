@@ -8,6 +8,7 @@ import React from "react";
 export interface RankRow {
   name: string;
   category?: string;                                 // 구분 열 (단품 / 번들)
+  code?: string;                                     // 제품명 옆에 작게 표시할 제품코드 (예: SB0941_US)
   roi: number | null;
   value: number;                                     // 금액 열 + 막대 길이
   segments?: { value: number; color: string }[];     // 막대를 나눠 칠할 때 (합 = value)
@@ -86,7 +87,7 @@ function SummaryBox({ s }: { s: RankSummary }) {
 export default function RankTable({ title, subtitle, rows, valueLabel, barColor = ACCENT, legend, summary, summaries, footer, emptyText, showCategory, extraLabel }: Props) {
   const max = Math.max(1, ...rows.map(r => r.value));
   const cols = (showCategory
-    ? "28px minmax(180px, 300px) 56px 64px 140px minmax(120px, 1fr)"
+    ? "28px minmax(220px, 340px) 56px 64px 140px minmax(120px, 1fr)"
     : "28px minmax(180px, 320px) 64px 140px minmax(120px, 1fr)") + (extraLabel ? " 80px" : "");
 
   return (
@@ -138,7 +139,10 @@ export default function RankTable({ title, subtitle, rows, valueLabel, barColor 
                   style={{ display: "grid", gridTemplateColumns: cols, gap: 12, alignItems: "center", padding: "9px 4px", borderBottom: i < rows.length - 1 ? "1px solid #f1f5f9" : "none" }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 700, color: i < 3 ? ACCENT : "#94a3b8" }}>{i + 1}</div>
-                  <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.name}>{r.name}</div>
+                  <div style={{ fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={r.code ? `${r.name} (${r.code})` : r.name}>
+                    {r.name}
+                    {r.code && <span style={{ marginLeft: 6, fontSize: 11, color: "#94a3b8", fontVariantNumeric: "tabular-nums" }}>{r.code}</span>}
+                  </div>
                   {showCategory && (
                     <div style={{ textAlign: "center" }}>
                       {r.category ? (

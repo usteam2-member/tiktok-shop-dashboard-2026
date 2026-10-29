@@ -56,7 +56,7 @@ export default function ProductTopTable({ startDate, endDate, shopTotal, fxRate 
       valueLabel="매출액"
       showCategory
       extraLabel="객단가"
-      rows={top.map(r => ({ name: r.baseName, category: r.type, roi: r.roi, value: r.gmv, hint: `Ads spend ${won(r.ads)}`, extra: aovUsd(r.pid, r.sku) }))}
+      rows={top.map(r => ({ name: r.baseName, code: r.sku || undefined, category: r.type, roi: r.roi, value: r.gmv, hint: `Ads spend ${won(r.ads)}`, extra: aovUsd(r.pid, r.sku) }))}
       summaries={[
         ...[5, 10, 20].map(n => ({ label: `Top ${n} 매출 합계`, value: sumTop(n), shareLabel: "샵 전체 매출 대비", share: shareOf(sumTop(n)) })),
       ]}
