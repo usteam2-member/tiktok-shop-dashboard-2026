@@ -126,7 +126,7 @@ export default function DashboardPage() {
     return !isDefault;
   }, [data, startDate, endDate, activeQuick]);
 
-  // 📊 매출 Top 10은 ProductTopTable이 Gmax 광고 시트에서 같은 기간으로 집계
+  // 📊 매출 Top 20은 ProductTopTable이 Gmax 광고 시트에서 같은 기간으로 집계
   const shopTotal = useMemo(() => kpiData.reduce((a, r) => a + r.krw, 0), [kpiData]);
   // 객단가 달러 환산용 환율 = 같은 기간 총 매출(KRW) ÷ 총 매출(USD)
   const fxRate = useMemo(() => {
@@ -298,7 +298,7 @@ export default function DashboardPage() {
                 <KpiRow data={kpiData} />
                 <DailyCharts data={chartData} activeQuick={activeQuick} isCustomRange={isCustomRange} />
                 
-                {/* 📊 매출액 Top 10 제품 (제품명 | ROI | 매출액 | 막대) */}
+                {/* 📊 매출액 Top 20 제품 (제품명 | 구분 | ROI | 매출액 | 막대 | 객단가) */}
                 <div style={{ gridColumn: "1 / -1" }}>
                   <ProductTopTable startDate={startDate} endDate={endDate} shopTotal={shopTotal} fxRate={fxRate} />
                 </div>
