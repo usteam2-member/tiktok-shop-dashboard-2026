@@ -289,18 +289,11 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
   const sumT = top.reduce((a, r) => a + r.target, 0);
   const sumP = top.reduce((a, r) => a + (r.prev || 0), 0);
 
-  // 금액 위에 막대
-  const cell = (v: number | null, color: string, bold?: boolean) => (
-    <div>
-      <div style={{ height: 10, background: "#f1f5f9", borderRadius: 3, marginBottom: 6 }}>
-        {v !== null && v > 0 && <div style={{ width: `${Math.max(1, (v / max) * 100)}%`, height: "100%", background: color, borderRadius: 3 }} />}
-      </div>
-      <div style={{ fontSize: 14, fontWeight: bold ? 700 : 500, color: bold ? "#1c1917" : "#57534e", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-        {v === null ? "-" : v > 0 ? fmtShort(v) : "0"}
-      </div>
-    </div>
+  // 주요지표 > 제품별 매출과 같은 모양: 한 칸 안에 위 = 전월, 아래 = 목표 막대
+  const bar = (v: number | null, color: string) => (
+    <div style={{ height: 14, width: `${v && v > 0 ? Math.max(0.6, (v / max) * 100) : 0}%`, minWidth: v && v > 0 ? 3 : 0, background: color, borderRadius: 3 }} />
   );
-  const GRID_T = "32px minmax(200px, 1.4fr) 64px minmax(160px, 1.3fr) minmax(160px, 1.3fr) 96px";
+  const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 110px";
   const prevLabel = `${pm}월 ${prevOngoing ? "마감예상" : "마감"}`;
 
   return (
@@ -315,22 +308,24 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
 
       <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 20px 6px", overflowX: "auto" }}>
         <div style={{ minWidth: 760 }}>
-          <div style={{ display: "flex", gap: 18, fontSize: 13, color: "#57534e", paddingBottom: 12, borderBottom: "1px solid #e7e5e4" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 18, fontSize: 13, color: "#57534e", paddingBottom: 12, borderBottom: "1px solid #e7e5e4" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_PREV }} />{prevLabel}</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_CUR }} />{tm}월 목표</span>
+            <span style={{ color: UP }}>↑ <span style={{ color: "#57534e" }}>증가</span></span>
+            <span style={{ color: DOWN }}>↓ <span style={{ color: "#57534e" }}>감소</span></span>
           </div>
           {/* 열 제목 */}
-          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, padding: "12px 0 8px", borderBottom: "1px solid #e7e5e4", fontSize: 12, color: "#a8a29e" }}>
+          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 12, padding: "12px 0 8px", borderBottom: "1px solid #e7e5e4", fontSize: 12, fontWeight: 500, color: "#a8a29e" }}>
             <div>#</div><div>제품명</div><div style={{ textAlign: "center" }}>구분</div>
-            <div style={{ textAlign: "right" }}>{prevLabel}</div>
-            <div style={{ textAlign: "right" }}>{tm}월 목표</div>
+            <div /><div />
+            <div style={{ textAlign: "right" }}>매출액</div>
             <div style={{ textAlign: "right" }}>증감</div>
           </div>
           {top.map((r, i) => {
             const pct = r.prev && r.prev > 0 ? ((r.target - r.prev) / r.prev) * 100 : null;
             const type = typeOf(r.sku);
             return (
-              <div key={r.name + i} style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, alignItems: "center", padding: "14px 0", borderBottom: i < top.length - 1 ? "1px solid #e7e5e4" : "none" }}>
+              <div key={r.name + i} style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 12, alignItems: "center", padding: "14px 0", borderBottom: "1px solid #e7e5e4" }}>
                 <div style={{ fontSize: 16, color: "#78716c" }}>{i + 1}</div>
                 <div>
                   <div style={{ fontSize: 15, color: "#1c1917", lineHeight: 1.35 }}>{r.name}</div>
@@ -344,20 +339,34 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
                     <span style={{ display: "inline-block", fontSize: 12, fontWeight: 600, padding: "3px 12px", borderRadius: 999, background: type === "번들" ? "#eef2ff" : "#f1f5f9", color: type === "번들" ? "#4338ca" : "#475569" }}>{type}</span>
                   ) : <span style={{ color: "#cbd5e1" }}>-</span>}
                 </div>
-                {cell(r.prev, C_PREV)}
-                {cell(r.target, C_CUR, true)}
-                <div style={{ textAlign: "right", fontSize: 15, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
+                <div style={{ fontSize: 11, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}>
+                  <div>{pm}월</div>
+                  <div>{tm}월</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {bar(r.prev, C_PREV)}
+                  {bar(r.target, C_CUR)}
+                </div>
+                <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                  <div>{r.prev === null ? "-" : r.prev > 0 ? fmtShort(r.prev) : "0"}</div>
+                  <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.target)}</div>
+                </div>
+                <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                   {pct === null ? (r.prev === null ? `${pm}월 없음` : "신규") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
                 </div>
               </div>
             );
           })}
           {/* 합계 */}
-          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 16, alignItems: "center", padding: "14px 0", borderTop: "2px solid #d6d3d1", fontWeight: 700 }}>
+          <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 12, alignItems: "center", padding: "14px 0", borderTop: "2px solid #d6d3d1", fontWeight: 700 }}>
             <div /><div style={{ fontSize: 14 }}>Top 10 합계</div><div />
-            <div style={{ textAlign: "right", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtShort(sumP)}</div>
-            <div style={{ textAlign: "right", fontSize: 14, fontVariantNumeric: "tabular-nums" }}>{fmtShort(sumT)}</div>
-            <div style={{ textAlign: "right", fontSize: 15, color: sumP > 0 ? (sumT >= sumP ? UP : DOWN) : "#a8a29e" }}>
+            <div style={{ fontSize: 11, fontWeight: 400, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}><div>{pm}월</div><div>{tm}월</div></div>
+            <div />
+            <div style={{ fontSize: 14, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ color: "#57534e", fontWeight: 500 }}>{fmtShort(sumP)}</div>
+              <div>{fmtShort(sumT)}</div>
+            </div>
+            <div style={{ textAlign: "right", fontSize: 16, fontVariantNumeric: "tabular-nums", color: sumP > 0 ? (sumT >= sumP ? UP : DOWN) : "#a8a29e" }}>
               {sumP > 0 ? `${sumT >= sumP ? "↑" : "↓"} ${Math.abs(((sumT - sumP) / sumP) * 100).toFixed(1)}%` : "-"}
             </div>
           </div>
