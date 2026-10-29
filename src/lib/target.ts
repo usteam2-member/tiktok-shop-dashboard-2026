@@ -14,6 +14,7 @@ export interface TargetRow {
   sku: string;              // 참고 코드 (없거나 "TBU"면 "")
   name: string;             // 품목명
   byMonth: Record<number, number>; // 월(1~12) → 목표 매출
+  qtyByMonth: Record<number, number>; // 월(1~12) → 목표 판매량
 }
 
 export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: number[] } {
@@ -28,6 +29,11 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
   header.forEach((c, i) => {
     const m = norm(c).match(/^(\d{1,2})월매출$/); // "6월 매출 예상" 같은 열은 제외
     if (m) monthCols.push({ month: parseInt(m[1]), col: i });
+  });
+  const qtyCols: { month: number; col: number }[] = [];
+  header.forEach((c, i) => {
+    const m = norm(c).match(/^(\d{1,2})월판매량$/);
+    if (m) qtyCols.push({ month: parseInt(m[1]), col: i });
   });
 
   const num = (v: string | undefined) => {
@@ -47,7 +53,9 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
     const skuRaw = (r[cSku] || "").trim();
     const byMonth: Record<number, number> = {};
     for (const { month, col } of monthCols) byMonth[month] = num(r[col]);
-    out.push({ owner: (r[cOwner] || "").trim(), sku: /^(SB|BD)\d+/.test(skuRaw) ? skuRaw : "", name, byMonth });
+    const qtyByMonth: Record<number, number> = {};
+    for (const { month, col } of qtyCols) qtyByMonth[month] = num(r[col]);
+    out.push({ owner: (r[cOwner] || "").trim(), sku: /^(SB|BD)\d+/.test(skuRaw) ? skuRaw : "", name, byMonth, qtyByMonth });
   }
   return { rows: out, months: monthCols.map(m => m.month) };
 }

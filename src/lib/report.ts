@@ -114,10 +114,11 @@ export interface ProductInfo { pid: string; sku: string; name: string; }
 export interface ProductMonthly {
   products: ProductInfo[];
   revenue: Record<string, number[]>; // "2026-09" → products 순서의 매출액
+  orders: Record<string, number[]>;  // "2026-09" → products 순서의 주문수(판매수량)
 }
 
 export function parseProductMonthly(rows: string[][]): ProductMonthly {
-  const empty: ProductMonthly = { products: [], revenue: {} };
+  const empty: ProductMonthly = { products: [], revenue: {}, orders: {} };
   const clean = (s: string | undefined) => (s || "").trim();
 
   let labelIdx = -1, best = 0;
@@ -141,6 +142,7 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
   const label = rows[labelIdx];
 
   const cols: number[] = [];
+  const ordCols: number[] = []; // 같은 블록의 주문수 열 (없으면 -1)
   const products: ProductInfo[] = [];
   for (let c = 0; c < label.length; c++) {
     if (!label[c].includes("매출액(KRW)")) continue;
@@ -149,6 +151,7 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     const name = (clean(nameRow[c]).split("\n")[0] || sku || `열 ${c + 1}`).replace(/\s+/g, " ").trim();
     if (!pid && !sku) continue;
     cols.push(c);
+    ordCols.push([c + 1, c + 2].find(k => clean(label[k]).includes("주문수")) ?? -1);
     products.push({ pid, sku, name });
   }
 
@@ -158,6 +161,7 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     return !t || t.startsWith("#") || isNaN(n) ? 0 : n;
   };
   const revenue: Record<string, number[]> = {};
+  const orders: Record<string, number[]> = {};
   for (let i = labelIdx + 1; i < rows.length; i++) {
     // 월 행: 미국 "2609" / 영국 "26년9월"
     const b0 = clean(rows[i][1]).replace(/\s/g, "");
@@ -170,9 +174,13 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     const vals = cols.map(c => num(src[c]));
     if (vals.every(v => v === 0)) continue;
     const mk = `20${b.slice(0, 2)}-${b.slice(2, 4)}`;
-    if (!(mk in revenue)) revenue[mk] = vals;
+    if (!(mk in revenue)) {
+      revenue[mk] = vals;
+      // '마감 예상' 행에 주문수가 비어 있으면 월 누적 행 값 사용
+      orders[mk] = ordCols.map(c => (c >= 0 ? num(src[c]) || num(rows[i][c]) : 0));
+    }
   }
-  return { products, revenue };
+  return { products, revenue, orders };
 }
 
 const productCache: Record<string, Promise<ProductMonthly>> = {};

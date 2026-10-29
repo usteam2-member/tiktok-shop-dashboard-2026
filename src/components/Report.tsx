@@ -49,10 +49,11 @@ const fmtShort = (v: number) => {
   const e = v / 1e8;
   return `${e >= 0.1 || e === 0 ? e.toLocaleString("ko-KR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : e.toFixed(2)}억`;
 };
+const fmtQty = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}개`;
 const C_PREV = "#8bb8e8";
 const C_CUR = "#1e4d8c";
 
-const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 100px 70px";
+const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 100px 90px 100px 70px";
 const typeOf = (sku: string) => (sku.startsWith("BD") ? "번들" : sku.startsWith("SB") ? "단품" : "");
 
 // 제품별 매출: 선택 월 Top 10 × 전월 비교
@@ -73,10 +74,12 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
   if (!data) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>제품별 매출 불러오는 중...</div>;
   const curVals = data.revenue[cur.key];
   const prevVals = prev ? data.revenue[prev.key] : undefined;
+  const curQty = data.orders[cur.key] || [];
+  const prevQty = prev ? data.orders[prev.key] || [] : [];
   if (!curVals) return <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}>{cur.month}월 제품별 매출이 없어요</div>;
 
   const top = data.products
-    .map((p, i) => ({ ...p, cur: curVals[i] || 0, prev: prevVals?.[i] || 0 }))
+    .map((p, i) => ({ ...p, cur: curVals[i] || 0, prev: prevVals?.[i] || 0, curQty: curQty[i] || 0, prevQty: prevQty[i] || 0 }))
     .filter(r => r.cur > 0)
     .sort((a, b) => b.cur - a.cur)
     .slice(0, 10);
@@ -105,6 +108,7 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
           <div />
           <div />
           <div style={{ textAlign: "right" }}>매출액</div>
+          <div style={{ textAlign: "right" }}>판매수량</div>
           <div style={{ textAlign: "right" }}>증감</div>
           <div style={{ textAlign: "right" }}>ROI</div>
         </div>
@@ -138,6 +142,10 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
                 {prev && <div>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
                 <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.cur)}</div>
               </div>
+              <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                {prev && <div>{r.prevQty > 0 ? fmtQty(r.prevQty) : "-"}</div>}
+                <div style={{ color: "#1c1917", fontWeight: 600 }}>{r.curQty > 0 ? fmtQty(r.curQty) : "-"}</div>
+              </div>
               <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                 {pct === null ? (prev ? "신규" : "-") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
               </div>
@@ -150,7 +158,7 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>출처: GMV | by Product 시트의 월별 &apos;마감 예상&apos; 행 · {cur.month}월 매출 Top 10 기준</div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>출처: GMV | by Product 시트의 월별 &apos;마감 예상&apos; 행 (판매수량 = 주문수) · {cur.month}월 매출 Top 10 기준</div>
     </div>
   );
 }
@@ -273,6 +281,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
   const year = tm === 1 && today.month === 12 ? today.year + 1 : today.year;
   const prevKey = `${pm === 12 && tm === 1 ? year - 1 : year}-${String(pm).padStart(2, "0")}`;
   const prevVals = products.revenue[prevKey] || [];
+  const prevQtyVals = products.orders[prevKey] || [];
   const prevOngoing = isOngoing({ year: pm === 12 && tm === 1 ? year - 1 : year, month: pm });
 
   const top = targets.rows
@@ -282,18 +291,21 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
     .map(r => {
       const m = matchProduct(r, products.products);
       const prev = m.indices.length ? m.indices.reduce((a, i) => a + (prevVals[i] || 0), 0) : null;
+      const prevQty = m.indices.length ? m.indices.reduce((a, i) => a + (prevQtyVals[i] || 0), 0) : null;
       const sku = r.sku || (m.indices.length ? products.products[m.indices[0]].sku : "");
-      return { ...r, sku, target: r.byMonth[tm], prev, via: m.via };
+      return { ...r, sku, target: r.byMonth[tm], prev, targetQty: r.qtyByMonth[tm] || 0, prevQty, via: m.via };
     });
   const max = Math.max(1, ...top.flatMap(r => [r.target, r.prev || 0]));
   const sumT = top.reduce((a, r) => a + r.target, 0);
   const sumP = top.reduce((a, r) => a + (r.prev || 0), 0);
+  const sumTQ = top.reduce((a, r) => a + r.targetQty, 0);
+  const sumPQ = top.reduce((a, r) => a + (r.prevQty || 0), 0);
 
   // 주요지표 > 제품별 매출과 같은 모양: 한 칸 안에 위 = 전월, 아래 = 목표 막대
   const bar = (v: number | null, color: string) => (
     <div style={{ height: 14, width: `${v && v > 0 ? Math.max(0.6, (v / max) * 100) : 0}%`, minWidth: v && v > 0 ? 3 : 0, background: color, borderRadius: 3 }} />
   );
-  const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 110px 110px";
+  const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 100px 90px 110px";
   const prevLabel = `${pm}월 ${prevOngoing ? "마감예상" : "마감"}`;
 
   return (
@@ -307,7 +319,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
       </div>
 
       <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 20px 6px", overflowX: "auto" }}>
-        <div style={{ minWidth: 760 }}>
+        <div style={{ minWidth: 860 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 18, fontSize: 13, color: "#57534e", paddingBottom: 12, borderBottom: "1px solid #e7e5e4" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_PREV }} />{prevLabel}</span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: C_CUR }} />{tm}월 목표</span>
@@ -319,6 +331,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
             <div>#</div><div>제품명</div><div style={{ textAlign: "center" }}>구분</div>
             <div /><div />
             <div style={{ textAlign: "right" }}>매출액</div>
+            <div style={{ textAlign: "right" }}>판매수량</div>
             <div style={{ textAlign: "right" }}>증감</div>
           </div>
           {top.map((r, i) => {
@@ -351,6 +364,10 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
                   <div>{r.prev === null ? "-" : r.prev > 0 ? fmtShort(r.prev) : "0"}</div>
                   <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.target)}</div>
                 </div>
+                <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                  <div>{r.prevQty ? fmtQty(r.prevQty) : "-"}</div>
+                  <div style={{ color: "#1c1917", fontWeight: 600 }}>{r.targetQty > 0 ? fmtQty(r.targetQty) : "-"}</div>
+                </div>
                 <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                   {pct === null ? (r.prev === null ? `${pm}월 없음` : "신규") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
                 </div>
@@ -366,6 +383,10 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
               <div style={{ color: "#57534e", fontWeight: 500 }}>{fmtShort(sumP)}</div>
               <div>{fmtShort(sumT)}</div>
             </div>
+            <div style={{ fontSize: 13, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ color: "#57534e", fontWeight: 500 }}>{sumPQ > 0 ? fmtQty(sumPQ) : "-"}</div>
+              <div>{sumTQ > 0 ? fmtQty(sumTQ) : "-"}</div>
+            </div>
             <div style={{ textAlign: "right", fontSize: 16, fontVariantNumeric: "tabular-nums", color: sumP > 0 ? (sumT >= sumP ? UP : DOWN) : "#a8a29e" }}>
               {sumP > 0 ? `${sumT >= sumP ? "↑" : "↓"} ${Math.abs(((sumT - sumP) / sumP) * 100).toFixed(1)}%` : "-"}
             </div>
@@ -373,7 +394,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
         </div>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: 목표 = 매출 목표 시트 &apos;{tm}월 매출&apos; 열 · {pm}월 = GMV | by Product 시트 &apos;마감 예상&apos; 행 · 참고 코드(SKU)로 연결하고, 코드가 없는 품목은 이름으로 연결(&apos;이름 연결&apos; 표시)
+        출처: 목표 = 매출 목표 시트 &apos;{tm}월 매출&apos;·&apos;{tm}월 판매량&apos; 열 · {pm}월 = GMV | by Product 시트 &apos;마감 예상&apos; 행 · 참고 코드(SKU)로 연결하고, 코드가 없는 품목은 이름으로 연결(&apos;이름 연결&apos; 표시)
       </div>
     </div>
   );
