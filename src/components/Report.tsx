@@ -53,7 +53,7 @@ const fmtQty = (v: number) => `${Math.round(v).toLocaleString("ko-KR")}개`;
 const C_PREV = "#8bb8e8";
 const C_CUR = "#1e4d8c";
 
-const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 100px 90px 100px 70px";
+const GRID = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 90px 100px 100px 70px";
 const typeOf = (sku: string) => (sku.startsWith("BD") ? "번들" : sku.startsWith("SB") ? "단품" : "");
 
 // 제품별 매출: 선택 월 Top 10 × 전월 비교
@@ -107,9 +107,9 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
           <div style={{ textAlign: "center" }}>구분</div>
           <div />
           <div />
-          <div style={{ textAlign: "right" }}>매출액</div>
           <div style={{ textAlign: "right" }}>판매수량</div>
-          <div style={{ textAlign: "right" }}>증감</div>
+          <div style={{ textAlign: "right" }}>매출액</div>
+          <div style={{ textAlign: "right" }}>매출액 증감</div>
           <div style={{ textAlign: "right" }}>ROI</div>
         </div>
         {top.map((r, i) => {
@@ -139,12 +139,12 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
                 {bar(r.cur, C_CUR)}
               </div>
               <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
-                {prev && <div>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
-                <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.cur)}</div>
-              </div>
-              <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
                 {prev && <div>{r.prevQty > 0 ? fmtQty(r.prevQty) : "-"}</div>}
                 <div style={{ color: "#1c1917", fontWeight: 600 }}>{r.curQty > 0 ? fmtQty(r.curQty) : "-"}</div>
+              </div>
+              <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                {prev && <div>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
+                <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.cur)}</div>
               </div>
               <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                 {pct === null ? (prev ? "신규" : "-") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
@@ -305,7 +305,7 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
   const bar = (v: number | null, color: string) => (
     <div style={{ height: 14, width: `${v && v > 0 ? Math.max(0.6, (v / max) * 100) : 0}%`, minWidth: v && v > 0 ? 3 : 0, background: color, borderRadius: 3 }} />
   );
-  const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 100px 90px 110px";
+  const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 90px 100px 110px";
   const prevLabel = `${pm}월 ${prevOngoing ? "마감예상" : "마감"}`;
 
   return (
@@ -330,9 +330,9 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
           <div style={{ display: "grid", gridTemplateColumns: GRID_T, gap: 12, padding: "12px 0 8px", borderBottom: "1px solid #e7e5e4", fontSize: 12, fontWeight: 500, color: "#a8a29e" }}>
             <div>#</div><div>제품명</div><div style={{ textAlign: "center" }}>구분</div>
             <div /><div />
-            <div style={{ textAlign: "right" }}>매출액</div>
             <div style={{ textAlign: "right" }}>판매수량</div>
-            <div style={{ textAlign: "right" }}>증감</div>
+            <div style={{ textAlign: "right" }}>매출액</div>
+            <div style={{ textAlign: "right" }}>매출액 증감</div>
           </div>
           {top.map((r, i) => {
             const pct = r.prev && r.prev > 0 ? ((r.target - r.prev) / r.prev) * 100 : null;
@@ -361,12 +361,12 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
                   {bar(r.target, C_CUR)}
                 </div>
                 <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
-                  <div>{r.prev === null ? "-" : r.prev > 0 ? fmtShort(r.prev) : "0"}</div>
-                  <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.target)}</div>
-                </div>
-                <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
                   <div>{r.prevQty ? fmtQty(r.prevQty) : "-"}</div>
                   <div style={{ color: "#1c1917", fontWeight: 600 }}>{r.targetQty > 0 ? fmtQty(r.targetQty) : "-"}</div>
+                </div>
+                <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+                  <div>{r.prev === null ? "-" : r.prev > 0 ? fmtShort(r.prev) : "0"}</div>
+                  <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.target)}</div>
                 </div>
                 <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                   {pct === null ? (r.prev === null ? `${pm}월 없음` : "신규") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
@@ -379,13 +379,13 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
             <div /><div style={{ fontSize: 14 }}>Top 10 합계</div><div />
             <div style={{ fontSize: 11, fontWeight: 400, color: "#a8a29e", lineHeight: "22px", textAlign: "right" }}><div>{pm}월</div><div>{tm}월</div></div>
             <div />
-            <div style={{ fontSize: 14, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
-              <div style={{ color: "#57534e", fontWeight: 500 }}>{fmtShort(sumP)}</div>
-              <div>{fmtShort(sumT)}</div>
-            </div>
             <div style={{ fontSize: 13, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
               <div style={{ color: "#57534e", fontWeight: 500 }}>{sumPQ > 0 ? fmtQty(sumPQ) : "-"}</div>
               <div>{sumTQ > 0 ? fmtQty(sumTQ) : "-"}</div>
+            </div>
+            <div style={{ fontSize: 14, textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
+              <div style={{ color: "#57534e", fontWeight: 500 }}>{fmtShort(sumP)}</div>
+              <div>{fmtShort(sumT)}</div>
             </div>
             <div style={{ textAlign: "right", fontSize: 16, fontVariantNumeric: "tabular-nums", color: sumP > 0 ? (sumT >= sumP ? UP : DOWN) : "#a8a29e" }}>
               {sumP > 0 ? `${sumT >= sumP ? "↑" : "↓"} ${Math.abs(((sumT - sumP) / sumP) * 100).toFixed(1)}%` : "-"}
