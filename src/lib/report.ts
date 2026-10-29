@@ -9,9 +9,12 @@ import { parseCSVFull } from "./gmax";
 import { usToday } from "./kpi";
 
 // 지역별 원본 시트 (둘 다 같은 양식)
-export interface ReportRegion { key: "us" | "uk"; label: string; flag: string; sheetId: string; dailyGid: string; productGid: string; }
+export interface ReportRegion {
+  key: "us" | "uk"; label: string; flag: string; sheetId: string; dailyGid: string; productGid: string;
+  targetGid?: string; // 매출 목표 탭 (보고 > 월 목표). 없으면 안내 문구 표시
+}
 export const REGIONS: ReportRegion[] = [
-  { key: "us", label: "미국", flag: "🇺🇸", sheetId: "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", dailyGid: "1032420248", productGid: "1578364048" },
+  { key: "us", label: "미국", flag: "🇺🇸", sheetId: "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", dailyGid: "1032420248", productGid: "1578364048", targetGid: "275604972" },
   { key: "uk", label: "영국", flag: "🇬🇧", sheetId: "1uwrbiCPg7OG7N38ZlYfClHeVD0gBI7RIeWLzpH7_hak", dailyGid: "0", productGid: "1578364048" },
 ];
 

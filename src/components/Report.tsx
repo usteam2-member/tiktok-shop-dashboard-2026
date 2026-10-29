@@ -260,17 +260,26 @@ function MonthlyMeeting({ regions }: { regions: RegionData[] }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 월 목표: 목표 월 매출 Top 10 × 전월 마감(예상) 매출 비교 (미국)
+// 월 목표: 목표 월 매출 Top 10 × 전월 마감(예상) 매출 비교 (지역별: 미국 · 영국)
 //  목표 = 매출 목표 시트, 전월 = GMV | by Product 시트의 '마감 예상' 행
 // ─────────────────────────────────────────────────────────────
-function TargetCompare({ products }: { products: ProductMonthly | null }) {
+function TargetCompare({ region, products }: { region: ReportRegion; products: ProductMonthly | null }) {
   const [targets, setTargets] = useState<{ rows: TargetRow[]; months: number[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [month, setMonth] = useState(0);
-  useEffect(() => { fetchTargets().then(setTargets).catch(e => setErr(e.message)); }, []);
+  useEffect(() => {
+    if (region.targetGid) fetchTargets(region.sheetId, region.targetGid).then(setTargets).catch(e => setErr(e.message));
+  }, [region]);
 
-  if (err) return <div style={{ padding: 16, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {err}</div>;
-  if (!targets || !products) return <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>불러오는 중...</div>;
+  const title = (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 800, color: "#0f172a", margin: "8px 0 12px" }}>
+      <span>{region.flag}</span>{region.label}
+    </div>
+  );
+  const wrap = (body: React.ReactNode) => <div style={{ marginBottom: 44 }}>{title}{body}</div>;
+  if (!region.targetGid) return wrap(<div style={{ padding: 16, background: "#f8fafc", border: "1px dashed #cbd5e1", color: "#64748b", borderRadius: 8, fontSize: 13 }}>{region.label} 매출 목표 시트가 아직 연결되지 않았어요</div>);
+  if (err) return wrap(<div style={{ padding: 16, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>⚠️ {err}</div>);
+  if (!targets || !products) return wrap(<div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>불러오는 중...</div>);
 
   const today = usToday();
   const available = targets.months.filter(m => targets.rows.some(r => (r.byMonth[m] || 0) > 0));
@@ -308,14 +317,14 @@ function TargetCompare({ products }: { products: ProductMonthly | null }) {
   const GRID_T = "36px minmax(180px, 1.3fr) 76px 32px minmax(160px, 2fr) 90px 100px 110px";
   const prevLabel = `${pm}월 ${prevOngoing ? "마감예상" : "마감"}`;
 
-  return (
+  return wrap(
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#475569" }}>목표 월</span>
         <select value={tm} onChange={e => setMonth(Number(e.target.value))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}>
           {available.map(m => <option key={m} value={m}>{m}월</option>)}
         </select>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>🇺🇸 미국 · {tm}월 목표 매출 Top 10 × {prevLabel} 매출</span>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>{tm}월 목표 매출 Top 10 × {prevLabel} 매출</span>
       </div>
 
       <div style={{ background: "#fdfcfb", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 20px 6px", overflowX: "auto" }}>
@@ -421,7 +430,7 @@ export default function Report() {
 
   const body = useMemo(() => {
     if (tab === "주요지표") return <MonthlyMeeting regions={regions} />;
-    if (tab === "월 목표") return <TargetCompare products={regions.find(r => r.region.key === "us")?.products ?? null} />;
+    if (tab === "월 목표") return <>{regions.map(d => <TargetCompare key={d.region.key} region={d.region} products={d.products} />)}</>;
     return null;
   }, [regions, tab]);
 

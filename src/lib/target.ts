@@ -60,16 +60,21 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
   return { rows: out, months: monthCols.map(m => m.month) };
 }
 
-let cache: Promise<{ rows: TargetRow[]; months: number[] }> | null = null;
-export function fetchTargets() {
-  if (!cache) {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_TARGET}`;
-    cache = fetch(url, { cache: "no-store" })
-      .then(res => { if (!res.ok) throw new Error("매출 목표 시트를 불러오지 못했어요"); return res.text(); })
-      .then(t => parseTargets(parseCSVFull(t)))
-      .catch(e => { cache = null; throw e; });
+// 지역마다 시트가 달라서 (시트 ID, gid)별로 캐시
+const cache: Record<string, Promise<{ rows: TargetRow[]; months: number[] }>> = {};
+export function fetchTargets(sheetId: string = SHEET_ID, gid: string = GID_TARGET) {
+  const k = `${sheetId}:${gid}`;
+  if (!cache[k]) {
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    cache[k] = fetch(url, { cache: "no-store" })
+      .then(res => res.ok ? res.text() : "")
+      .then(t => {
+        if (!t || /^\s*<(!doctype|html)/i.test(t)) throw new Error("매출 목표 시트를 불러오지 못했어요 (시트가 '링크가 있는 모든 사용자 보기'로 공유돼 있는지 확인해 주세요)");
+        return parseTargets(parseCSVFull(t));
+      })
+      .catch(e => { delete cache[k]; throw e; });
   }
-  return cache;
+  return cache[k];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -93,7 +98,11 @@ const key = (s: string) => s.replace(/^헤어_/, "").replace(/\s+/g, "").toLower
 
 // 같은 SKU가 여러 리스팅(PID)으로 나뉘어 있으면 모두 더하도록 해당 제품 칸 번호를 전부 돌려줌
 export function matchProduct(t: TargetRow, products: ProductInfo[]): { indices: number[]; via: "sku" | "alias" | "name" | null } {
-  const bySku = (sku: string) => products.map((p, i) => (p.sku === sku ? i : -1)).filter(i => i >= 0);
+  // 영국 시트는 단품 SKU가 _UK로 끝나서, _US 코드면 _UK로도 찾음
+  const bySku = (sku: string) => {
+    const alt = sku.replace(/_US$/, "_UK");
+    return products.map((p, i) => (p.sku === sku || p.sku === alt ? i : -1)).filter(i => i >= 0);
+  };
   if (t.sku) {
     const ix = bySku(t.sku);
     if (ix.length) return { indices: ix, via: "sku" };
