@@ -268,7 +268,7 @@ function TargetCompare({ region, products }: { region: ReportRegion; products: P
   const [err, setErr] = useState<string | null>(null);
   const [month, setMonth] = useState(0);
   useEffect(() => {
-    if (region.targetGid) fetchTargets(region.sheetId, region.targetGid).then(setTargets).catch(e => setErr(e.message));
+    if (region.targetGid) fetchTargets(region.sheetId, region.targetGid, region.targetOpts).then(setTargets).catch(e => setErr(e.message));
   }, [region]);
 
   const title = (

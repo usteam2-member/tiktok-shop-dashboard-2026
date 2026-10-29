@@ -7,7 +7,7 @@ import { ProductInfo } from "./report";
 
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 const GID_TARGET = "275604972";
-const LAST_ROW = 50; // 목표 표는 시트 50행까지 (그 아래는 다른 표)
+const LAST_ROW = 50; // 미국 목표 표는 시트 50행까지 (그 아래는 다른 표)
 
 export interface TargetRow {
   owner: string;
@@ -17,13 +17,16 @@ export interface TargetRow {
   qtyByMonth: Record<number, number>; // 월(1~12) → 목표 판매량
 }
 
-export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: number[] } {
+// opts.lastRow: 이 행(시트 행 번호)까지만 읽기 · opts.stopAtBlank: 품목 다음 첫 빈 줄에서 멈춤 (영국: 아래에 재고·캠페인 표가 붙어 있음)
+export function parseTargets(rows: string[][], opts: { lastRow?: number; stopAtBlank?: boolean } = {}): { rows: TargetRow[]; months: number[] } {
+  const lastRow = opts.lastRow ?? LAST_ROW;
   const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "");
-  const h = rows.findIndex(r => r.some(c => norm(c) === "품목명") && r.some(c => /^\d{1,2}월매출$/.test(norm(c))));
+  const isName = (c: string) => ["품목명", "제품"].includes(norm(c));
+  const h = rows.findIndex(r => r.some(isName) && r.some(c => /^\d{1,2}월매출$/.test(norm(c))));
   if (h < 0) return { rows: [], months: [] };
   const header = rows[h];
-  const cName = header.findIndex(c => norm(c) === "품목명");
-  const cSku = header.findIndex(c => norm(c) === "참고코드");
+  const cName = header.findIndex(isName);
+  const cSku = header.findIndex(c => ["참고코드", "코드"].includes(norm(c)));
   const cOwner = header.findIndex(c => norm(c).includes("담당자"));
   const monthCols: { month: number; col: number }[] = [];
   header.forEach((c, i) => {
@@ -44,8 +47,9 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
 
   const out: TargetRow[] = [];
   let blank = 0;
-  for (let i = h + 1; i < Math.min(rows.length, LAST_ROW); i++) {
+  for (let i = h + 1; i < Math.min(rows.length, lastRow); i++) {
     const r = rows[i];
+    if (opts.stopAtBlank && out.length && r.every(c => !c.trim())) break;
     const name = (r[cName] || "").split("\n")[0].replace(/\s+/g, " ").trim();
     if (!name) { if (++blank >= 10) break; continue; } // 빈 줄이 이어지면 목표 표 끝
     blank = 0;
@@ -62,7 +66,7 @@ export function parseTargets(rows: string[][]): { rows: TargetRow[]; months: num
 
 // 지역마다 시트가 달라서 (시트 ID, gid)별로 캐시
 const cache: Record<string, Promise<{ rows: TargetRow[]; months: number[] }>> = {};
-export function fetchTargets(sheetId: string = SHEET_ID, gid: string = GID_TARGET) {
+export function fetchTargets(sheetId: string = SHEET_ID, gid: string = GID_TARGET, opts: { lastRow?: number; stopAtBlank?: boolean } = {}) {
   const k = `${sheetId}:${gid}`;
   if (!cache[k]) {
     const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
@@ -70,7 +74,7 @@ export function fetchTargets(sheetId: string = SHEET_ID, gid: string = GID_TARGE
       .then(res => res.ok ? res.text() : "")
       .then(t => {
         if (!t || /^\s*<(!doctype|html)/i.test(t)) throw new Error("매출 목표 시트를 불러오지 못했어요 (시트가 '링크가 있는 모든 사용자 보기'로 공유돼 있는지 확인해 주세요)");
-        return parseTargets(parseCSVFull(t));
+        return parseTargets(parseCSVFull(t), opts);
       })
       .catch(e => { delete cache[k]; throw e; });
   }
