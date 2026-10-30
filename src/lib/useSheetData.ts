@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
+import { parseCSVFull } from "./gmax";
 
 const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
 const GID_DAILY = "1032420248"; // 매출 raw 시트 (J열 = 매출액 KRW)
@@ -371,34 +372,79 @@ function buildProducts(sheet: ProductSheet): ProductRow[] {
 // ─────────────────────────────────────────────────────────────
 // GMV | 소재
 // ─────────────────────────────────────────────────────────────
+// 열 위치가 아니라 라벨로 찾음: 라벨 행(총 소재 | 신규 소재 | 매출 소재 | GMV)의 '신규 소재' 칸마다 제품 하나
+//  PID 행 = 라벨 행 위에서 긴 숫자가 처음 나오는 행, SKU 행 = SKU 패턴이 가장 많은 행
+//  월 값 = A열 월 행(2609 등). 월 행이 비어 있으면 그 달 날짜 행(B열 YYMMDD) 합계
 function parseSojaeData(rows: string[][]): SojaeRow[] {
   if (rows.length < 5) return [];
+  const clean = (v: string | undefined) => (v || "").replace(/\s+/g, "");
+  const isNew = (v: string | undefined) => clean(v).startsWith("신규소재");
 
-  const result: SojaeRow[] = [];
-  const skuRow = rows[1];
-  const productsRow = rows[2];
+  let labelIdx = -1, best = 0;
+  for (let i = 0; i < Math.min(12, rows.length); i++) {
+    const cnt = rows[i].filter(isNew).length;
+    if (cnt > best) { best = cnt; labelIdx = i; }
+  }
+  if (labelIdx < 0) return [];
+  const label = rows[labelIdx];
+  const SKU = /^(SB\d+_[A-Z]+|BD\d+(_[A-Z]+)?)$/;
+  let skuRow: string[] = [], n = 0;
+  for (let i = 0; i < labelIdx; i++) {
+    const c = rows[i].filter(v => SKU.test((v || "").trim())).length;
+    if (c > n) { n = c; skuRow = rows[i]; }
+  }
+  const pidRow = rows.slice(0, labelIdx).find(r => r.some(v => /^\d{15,}$/.test((v || "").trim()))) || [];
+  const nameRow = rows[labelIdx - 1] || [];
 
-  const pidRow = rows[0] || [];
-  const skuBlocks: Array<{ skuIdx: number; sku: string; pid: string; productName: string }> = [];
-  for (let colIdx = 2; colIdx < (skuRow?.length || 0); colIdx += 4) {
-    const sku = skuRow[colIdx]?.trim();
-    if (!sku) continue;
-    const pid = (pidRow[colIdx] || "").trim();
-    skuBlocks.push({ skuIdx: colIdx, sku, pid: /^\d{15,}$/.test(pid) ? pid : "", productName: productsRow?.[colIdx]?.trim() || "" });
+  // 블록: 신규 소재 칸(c) 기준으로 같은 블록 안의 총 소재 / 매출 소재 / GMV 칸 찾기
+  const blocks: { pid: string; sku: string; name: string; total: number; nw: number; sales: number; gmv: number }[] = [];
+  for (let c = 0; c < label.length; c++) {
+    if (!isNew(label[c])) continue;
+    const near = (pred: (v: string) => boolean) => [c - 1, c + 1, c + 2, c - 2].find(k => k >= 0 && pred(clean(label[k]))) ?? -1;
+    const total = near(v => v.startsWith("총소재"));
+    const sales = near(v => v.startsWith("매출소재"));
+    const gmv = near(v => v.toLowerCase().startsWith("gmv"));
+    const span = [total, c, sales, gmv].filter(k => k >= 0);
+    const lo = Math.min(...span), hi = Math.max(...span);
+    const pick = (row: string[], re: RegExp) => { for (let k = lo; k <= hi; k++) { const v = (row[k] || "").trim(); if (re.test(v)) return v; } return ""; };
+    const pid = pick(pidRow, /^\d{15,}$/);
+    const sku = pick(skuRow, SKU);
+    if (!pid && !sku) continue;
+    const name = ((nameRow[lo] || "").split("\n")[0] || sku).trim();
+    blocks.push({ pid, sku, name, total, nw: c, sales, gmv });
   }
 
-  for (let rowIdx = 4; rowIdx < rows.length; rowIdx++) {
-    const row = rows[rowIdx];
-    const dt = row[0]?.trim();
-    if (!dt || !/^\d{4}$/.test(dt)) continue;
+  // 월 행 / 날짜 행 모으기
+  const monthRow: Record<string, string[]> = {};
+  const dailySum: Record<string, number[][]> = {}; // 월 → 블록별 [총, 신규, 매출, GMV]
+  for (let i = labelIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const a = (r[0] || "").trim(), b = (r[1] || "").trim();
+    if (/^\d{4}$/.test(a) && !monthRow[a]) { monthRow[a] = r; continue; }
+    if (/^2\d{5}$/.test(b)) {
+      const k = b.slice(0, 4);
+      const acc = (dailySum[k] ||= blocks.map(() => [0, 0, 0, 0]));
+      blocks.forEach((bl, j) => {
+        acc[j][0] += bl.total >= 0 ? safeNum(r[bl.total]) : 0;
+        acc[j][1] += safeNum(r[bl.nw]);
+        acc[j][2] += bl.sales >= 0 ? safeNum(r[bl.sales]) : 0;
+        acc[j][3] += bl.gmv >= 0 ? safeNum(r[bl.gmv]) : 0;
+      });
+    }
+  }
 
-    skuBlocks.forEach((block) => {
-      const totalVideo = safeNum(row[block.skuIdx]);
-      const newVideo = safeNum(row[block.skuIdx + 1]);
-      const makingSales = safeNum(row[block.skuIdx + 2]);
-      const gmv = safeNum(row[block.skuIdx + 3]);
+  const result: SojaeRow[] = [];
+  const months = Array.from(new Set([...Object.keys(monthRow), ...Object.keys(dailySum)])).sort();
+  for (const dt of months) {
+    blocks.forEach((bl, j) => {
+      const m = monthRow[dt];
+      let v = m
+        ? [bl.total >= 0 ? safeNum(m[bl.total]) : 0, safeNum(m[bl.nw]), bl.sales >= 0 ? safeNum(m[bl.sales]) : 0, bl.gmv >= 0 ? safeNum(m[bl.gmv]) : 0]
+        : [0, 0, 0, 0];
+      if (v.every(x => x === 0) && dailySum[dt]) v = dailySum[dt][j]; // 월 행이 비어 있으면 날짜 행 합계
+      const [totalVideo, newVideo, makingSales, gmv] = v;
       if (totalVideo > 0 || newVideo > 0 || makingSales > 0 || gmv > 0) {
-        result.push({ dt, sku: block.sku, pid: block.pid, productName: block.productName, totalVideo, newVideo, makingSales, gmv });
+        result.push({ dt, sku: bl.sku, pid: bl.pid, productName: bl.name, totalVideo, newVideo, makingSales, gmv });
       }
     });
   }
@@ -420,7 +466,11 @@ export function useSheetData() {
         const [dailyRows, productDailyRows, sojaeRows] = await Promise.all([
           fetchSheet(GID_DAILY),
           fetchSheet(GID_PRODUCT).catch(() => [] as string[][]),
-          fetchSheet(GID_SOJAE).catch(() => [] as string[][]),
+          // 소재 시트는 헤더에 줄바꿈 셀이 있어서 따옴표 안 줄바꿈까지 처리하는 parseCSVFull 사용
+          fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_SOJAE}`, { cache: "no-store" })
+            .then(r => (r.ok ? r.text() : ""))
+            .then(t => (t ? parseCSVFull(t) : []))
+            .catch(() => [] as string[][]),
         ]);
 
         const daily = parseDailyData(dailyRows);
