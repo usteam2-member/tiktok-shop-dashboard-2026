@@ -31,7 +31,8 @@ interface Props {
 
 export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData }: Props) {
   const [gmax, setGmax] = useState<GmaxData | null>(null);
-  useEffect(() => { fetchGmax().then(setGmax).catch(() => {}); }, []);
+  const [gmaxErr, setGmaxErr] = useState("");
+  useEffect(() => { fetchGmax().then(setGmax).catch(e => setGmaxErr(e?.message || "Gmax 광고 시트를 불러오지 못했어요")); }, []);
   const rows = useMemo(() => {
     const map: Record<string, { smp: number; newV: number; sales: number }> = {}; // "2609" → 값
     const get = (k: string) => (map[k] ||= { smp: 0, newV: 0, sales: 0 });
@@ -68,11 +69,18 @@ export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData
 
   const labels = rows.map(r => (r.partial ? `${r.label}(진행 중)` : r.label));
 
-  // 월별 ROAS (Gmax 광고 시트, 이 PID — PID가 없으면 SKU)
+  // 월별 ROAS (Gmax 광고 시트) — Gmax 시트의 제품 칸을 PID로 찾고, 없으면 SKU로 찾음
+  const gIdx = (() => {
+    if (!gmax) return [] as number[];
+    const byPid = gmax.products.map((g, i) => (g.pid && g.pid === pid ? i : -1)).filter(i => i >= 0);
+    if (byPid.length) return byPid;
+    return gmax.products.map((g, i) => (g.sku && g.sku === sku ? i : -1)).filter(i => i >= 0);
+  })();
   const roas = rows.map(r => {
-    if (!gmax) return null;
+    if (!gmax || !gIdx.length) return null;
     const ym = `20${r.key.slice(0, 2)}-${r.key.slice(2, 4)}`;
-    const hit = aggregateGmaxRange(gmax, `${ym}-01`, `${ym}-31`).filter(g => (/^\d{15,}$/.test(pid) ? g.pid === pid : g.sku === sku));
+    const all = aggregateGmaxRange(gmax, `${ym}-01`, `${ym}-31`);
+    const hit = gIdx.map(i => all[i]);
     const gmv = hit.reduce((a, g) => a + g.gmv, 0), ads = hit.reduce((a, g) => a + g.ads, 0);
     return ads > 0 ? gmv / ads : null;
   });
@@ -128,7 +136,14 @@ export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData
             <tr><td style={{ ...td, textAlign: "left", whiteSpace: "nowrap" }}>{dot(C_SALES)}매출 소재</td>{rows.map(r => <td key={r.key} style={td}>{r.sales.toLocaleString("ko-KR")}</td>)}</tr>
             {/* ROAS — 그래프 없이 숫자만 */}
             <tr title="Gmax ads | by Product 시트: 월 GMV ÷ Ads spend">
-              <td style={{ ...td, textAlign: "left", whiteSpace: "nowrap", color: "#475569", fontWeight: 600, borderBottom: "none" }}>ROAS</td>
+              <td style={{ ...td, textAlign: "left", whiteSpace: "nowrap", color: "#475569", fontWeight: 600, borderBottom: "none" }}>
+                ROAS
+                {(gmaxErr || (gmax && !gIdx.length)) && (
+                  <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 400, color: "#b45309" }}>
+                    {gmaxErr ? "· 시트 불러오기 실패" : "· Gmax 시트에 이 제품 없음"}
+                  </span>
+                )}
+              </td>
               {rows.map((r, i) => (
                 <td key={r.key} style={{ ...td, borderBottom: "none", fontWeight: 600, color: roas[i] === null ? "#cbd5e1" : "#1f2937" }}>
                   {roas[i] === null ? "-" : roas[i]!.toFixed(2)}
