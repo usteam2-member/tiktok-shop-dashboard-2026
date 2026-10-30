@@ -375,7 +375,7 @@ function buildProducts(sheet: ProductSheet): ProductRow[] {
 // 열 위치가 아니라 라벨로 찾음: 라벨 행(총 소재 | 신규 소재 | 매출 소재 | GMV)의 '신규 소재' 칸마다 제품 하나
 //  PID 행 = 라벨 행 위에서 긴 숫자가 처음 나오는 행, SKU 행 = SKU 패턴이 가장 많은 행
 //  월 값 = A열 월 행(2609 등). 월 행이 비어 있으면 그 달 날짜 행(B열 YYMMDD) 합계
-function parseSojaeData(rows: string[][]): SojaeRow[] {
+export function parseSojaeData(rows: string[][]): SojaeRow[] {
   if (rows.length < 5) return [];
   const clean = (v: string | undefined) => (v || "").replace(/\s+/g, "");
   const isNew = (v: string | undefined) => clean(v).startsWith("신규소재");
@@ -396,23 +396,36 @@ function parseSojaeData(rows: string[][]): SojaeRow[] {
   const pidRow = rows.slice(0, labelIdx).find(r => r.some(v => /^\d{15,}$/.test((v || "").trim()))) || [];
   const nameRow = rows[labelIdx - 1] || [];
 
-  // 블록: 신규 소재 칸(c) 기준으로 같은 블록 안의 총 소재 / 매출 소재 / GMV 칸 찾기
-  const blocks: { pid: string; sku: string; name: string; total: number; nw: number; sales: number; gmv: number }[] = [];
+  // 블록 나누기: 제품 칸은 4열(총 소재 | 신규 소재 | 매출 소재 | GMV)도 있고 3열(일부 열 없음)도 있음
+  //  라벨 순서(총 → 신규 → 매출 → GMV)가 다시 앞으로 돌아가는 칸에서 새 제품 칸이 시작된다고 봄
+  const rank = (v: string) => {
+    const t = clean(v).toLowerCase();
+    if (t.startsWith("총소재")) return 0;
+    if (t.startsWith("신규소재")) return 1;
+    if (t.startsWith("매출소재")) return 2;
+    if (t.startsWith("gmv")) return 3;
+    return -1;
+  };
+  const segs: { start: number; end: number; col: Record<number, number> }[] = [];
+  let prev = 99;
   for (let c = 0; c < label.length; c++) {
-    if (!isNew(label[c])) continue;
-    const near = (pred: (v: string) => boolean) => [c - 1, c + 1, c + 2, c - 2].find(k => k >= 0 && pred(clean(label[k]))) ?? -1;
-    const total = near(v => v.startsWith("총소재"));
-    const sales = near(v => v.startsWith("매출소재"));
-    const gmv = near(v => v.toLowerCase().startsWith("gmv"));
-    const span = [total, c, sales, gmv].filter(k => k >= 0);
-    const lo = Math.min(...span), hi = Math.max(...span);
-    const pick = (row: string[], re: RegExp) => { for (let k = lo; k <= hi; k++) { const v = (row[k] || "").trim(); if (re.test(v)) return v; } return ""; };
+    const r = rank(label[c]);
+    if (r < 0) continue;
+    if (r <= prev || !segs.length) segs.push({ start: c, end: c, col: {} });
+    const seg = segs[segs.length - 1];
+    seg.col[r] = c; seg.end = c; prev = r;
+  }
+  const blocks: { pid: string; sku: string; name: string; total: number; nw: number; sales: number; gmv: number }[] = [];
+  segs.forEach((seg, i) => {
+    if (seg.col[1] === undefined) return; // 신규 소재 칸이 없는 칸은 제외
+    const hi = i + 1 < segs.length ? segs[i + 1].start - 1 : seg.end; // 다음 제품 칸 바로 앞까지
+    const pick = (row: string[], re: RegExp) => { for (let k = seg.start; k <= hi; k++) { const v = (row[k] || "").trim(); if (re.test(v)) return v; } return ""; };
     const pid = pick(pidRow, /^\d{15,}$/);
     const sku = pick(skuRow, SKU);
-    if (!pid && !sku) continue;
-    const name = ((nameRow[lo] || "").split("\n")[0] || sku).trim();
-    blocks.push({ pid, sku, name, total, nw: c, sales, gmv });
-  }
+    if (!pid && !sku) return;
+    const name = (pick(nameRow, /\S/).split("\n")[0] || sku).trim();
+    blocks.push({ pid, sku, name, total: seg.col[0] ?? -1, nw: seg.col[1], sales: seg.col[2] ?? -1, gmv: seg.col[3] ?? -1 });
+  });
 
   // 월 행 / 날짜 행 모으기
   const monthRow: Record<string, string[]> = {};
