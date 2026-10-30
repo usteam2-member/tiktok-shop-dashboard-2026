@@ -1,12 +1,10 @@
 "use client";
 import { useMemo } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from "chart.js";
-import { Line as LineChartComponent, Bar as BarChartComponent } from "react-chartjs-2";
+import { Line as LineChartComponent } from "react-chartjs-2";
 import ProductMonthlyActivity from "./ProductMonthlyActivity";
 import type { PidMonthly } from "@/lib/useSheetData";
 
-// 새 통합 그래프(월별 샘플출고수 + 신규/매출 소재)를 먼저 적용해 보는 SKU — 확인 후 전체 적용
-const MERGED_PREVIEW_SKUS = ["SB0941_US"];
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
@@ -117,153 +115,6 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
     };
   }, [pidMonthly, product.pid]);
 
-  // 주간 데이터 + 샘플 출고수
-  const weeklyAndSampleData = useMemo(() => {
-    const weeks = [];
-    const today = new Date();
-
-    for (let i = 3; i >= 0; i--) {
-      const weekEnd = new Date(today);
-      weekEnd.setDate(weekEnd.getDate() - i * 7);
-      const weekStart = new Date(weekEnd);
-      weekStart.setDate(weekStart.getDate() - 7);
-
-      let weekRevenue = 0;
-      let weekSample = 0;
-
-      dailyData.forEach((row) => {
-        const dt = row.dt;
-        const krw = row.krw;
-        const smp = row.smp;
-
-        if (!isValidDate(dt)) return;
-
-        const dtStr = String(dt);
-        let rowDate: Date;
-
-        if (dtStr.length === 8) {
-          const year = parseInt(dtStr.substring(0, 4));
-          const month = parseInt(dtStr.substring(4, 6));
-          const day = parseInt(dtStr.substring(6, 8));
-          rowDate = new Date(year, month - 1, day);
-        } else if (dtStr.includes("-")) {
-          const parts = dtStr.split("-");
-          const year = parseInt(parts[0]);
-          const month = parseInt(parts[1]);
-          const day = parseInt(parts[2]);
-          rowDate = new Date(year, month - 1, day);
-        } else {
-          return;
-        }
-
-        if (rowDate >= weekStart && rowDate <= weekEnd) {
-          if (krw) weekRevenue += parseFloat(String(krw)) || 0;
-          if (smp) weekSample += parseFloat(String(smp)) || 0;
-        }
-      });
-
-      weeks.push({
-        week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`,
-        revenue: weekRevenue,
-        sample: weekSample,
-      });
-    }
-
-    console.log("📊 [Modal] Weekly data:", weeks);
-
-    return {
-      labels: weeks.map((w) => w.week),
-      datasets: [
-        {
-          label: "매출액 (₩)",
-          data: weeks.map((w) => w.revenue),
-          backgroundColor: "#3b82f6",
-          borderRadius: 4,
-          yAxisID: "y",
-        },
-        {
-          label: "샘플 출고수",
-          data: weeks.map((w) => w.sample),
-          backgroundColor: "#10b981",
-          borderRadius: 4,
-          yAxisID: "y1",
-        },
-      ],
-    };
-  }, [dailyData, isValidDate]);
-
-  // 소재 월별 데이터 집계
-  const sojaeMonthlyData = useMemo(() => {
-    console.log(`📊 [Modal] Aggregating sojae data for: ${product.sku}`);
-    console.log(`📊 [Modal] sojaeData length: ${sojaeData.length}`);
-    
-    // SKU별 필터링
-    const skuFiltered = sojaeData.filter((row: any) => row?.sku === product.sku);
-    console.log(`📊 [Modal] Sojae rows for SKU: ${skuFiltered.length}`);
-    
-    // 월별 합계
-    const monthMap: Record<string, { totalVideo: number; newVideo: number; makingSales: number }> = {};
-    
-    skuFiltered.forEach((row: any, idx: number) => {
-      const dt = row?.dt;
-      if (!dt) return;
-      
-      const totalVideo = parseFloat(row?.totalVideo) || 0;
-      const newVideo = parseFloat(row?.newVideo) || 0;
-      const makingSales = parseFloat(row?.makingSales) || 0;
-      
-      if (!monthMap[dt]) {
-        monthMap[dt] = { totalVideo: 0, newVideo: 0, makingSales: 0 };
-      }
-      monthMap[dt].totalVideo += totalVideo;
-      monthMap[dt].newVideo += newVideo;
-      monthMap[dt].makingSales += makingSales;
-      
-      if (idx < 3) {
-        console.log(`  Row ${idx}: dt=${dt}, total=${totalVideo}, new=${newVideo}, sales=${makingSales}`);
-      }
-    });
-    
-    console.log("📊 [Modal] Sojae month map:", monthMap);
-    
-    const sorted = Object.entries(monthMap)
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-12)
-      .map(([month, data]) => ({
-        month,
-        ...data,
-      }));
-    
-    console.log("📊 [Modal] Final sojae monthly data:", sorted);
-    
-    return {
-      labels: sorted.map((d) => d.month),
-      datasets: [
-        {
-          label: "신규 소재",
-          data: sorted.map((d) => d.newVideo),
-          backgroundColor: "#8b5cf6",
-          borderRadius: 4,
-          yAxisID: "y",
-        },
-        {
-          label: "매출 소재",
-          data: sorted.map((d) => d.makingSales),
-          backgroundColor: "#ec4899",
-          borderRadius: 4,
-          yAxisID: "y",
-        },
-        {
-          label: "총 소재",
-          data: sorted.map((d) => d.totalVideo),
-          backgroundColor: "#06b6d4",
-          borderRadius: 4,
-          yAxisID: "y",
-        },
-      ],
-    };
-  }, [sojaeData, product.sku]);
-
   const monthlyChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -294,105 +145,6 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
         beginAtZero: true,
         ticks: { font: { size: 12 } },
         grid: { color: "rgba(0, 0, 0, 0.05)" },
-      },
-      x: {
-        ticks: { font: { size: 12 } },
-        grid: { display: false },
-      },
-    },
-  };
-
-  const weeklyChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: "index" as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        labels: { font: { size: 12 }, usePointStyle: true },
-      },
-      tooltip: {
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
-        titleFont: { size: 13 },
-        bodyFont: { size: 12 },
-        padding: 10,
-        borderRadius: 6,
-        displayColors: true,
-        callbacks: {
-          label: function(context: any) {
-            const label = context.dataset.label || '';
-            if (context.dataset.yAxisID === 'y') {
-              return label + ': ₩' + context.parsed.y.toLocaleString();
-            } else {
-              return label + ': ' + context.parsed.y.toLocaleString();
-            }
-          }
-        }
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { font: { size: 12 } },
-        grid: { color: "rgba(0, 0, 0, 0.05)" },
-        title: {
-          display: true,
-          text: "매출액 (₩)",
-        },
-      },
-      y1: {
-        beginAtZero: true,
-        position: "right" as const,
-        ticks: { font: { size: 12 } },
-        grid: { drawOnChartArea: false },
-        title: {
-          display: true,
-          text: "출고수",
-        },
-      },
-      x: {
-        ticks: { font: { size: 12 } },
-        grid: { display: false },
-      },
-    },
-  };
-
-  const sojaeChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: {
-      mode: "index" as const,
-      intersect: false,
-    },
-    plugins: {
-      legend: {
-        labels: { font: { size: 12 }, usePointStyle: true },
-      },
-      tooltip: {
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
-        titleFont: { size: 13 },
-        bodyFont: { size: 12 },
-        padding: 10,
-        borderRadius: 6,
-        displayColors: true,
-        callbacks: {
-          label: function(context: any) {
-            return context.dataset.label + ': ' + context.parsed.y.toLocaleString() + '개';
-          }
-        }
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: { font: { size: 12 } },
-        grid: { color: "rgba(0, 0, 0, 0.05)" },
-        title: {
-          display: true,
-          text: "소재 개수",
-        },
       },
       x: {
         ticks: { font: { size: 12 } },
@@ -497,63 +249,15 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
             </div>
           </div>
 
-          {MERGED_PREVIEW_SKUS.includes(product.sku) ? (
-            /* 통합: 월별 샘플출고수 + 신규 소재 + 매출 소재 */
-            <div>
-              <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
-                📦 월별 샘플출고수 & 🎬 신규·매출 소재
-              </h3>
-              <div style={{ background: "#f9fafb", padding: "16px", borderRadius: "8px" }}>
-                <ProductMonthlyActivity pid={product.pid} sku={product.sku} pidMonthly={pidMonthly} sojaeData={sojaeData as any} />
-              </div>
-            </div>
-          ) : (<>
-          {/* 주간 매출액 & 샘플 출고수 */}
+          {/* 월별 샘플출고수 + 신규 소재 + 매출 소재 */}
           <div>
             <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
-              📈 주간 매출액 & 📦 샘플 출고수 (최근 4주)
+              📦 월별 샘플출고수 & 🎬 신규·매출 소재
             </h3>
-            <div
-              style={{
-                background: "#f9fafb",
-                padding: "16px",
-                borderRadius: "8px",
-                height: "350px",
-              }}
-            >
-              {weeklyAndSampleData.labels.length > 0 ? (
-                <BarChartComponent data={weeklyAndSampleData} options={weeklyChartOptions as any} />
-              ) : (
-                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
-                  데이터를 불러올 수 없습니다
-                </div>
-              )}
+            <div style={{ background: "#f9fafb", padding: "16px", borderRadius: "8px" }}>
+              <ProductMonthlyActivity pid={product.pid} sku={product.sku} pidMonthly={pidMonthly} sojaeData={sojaeData as any} />
             </div>
           </div>
-
-          {/* 소재 월별 데이터 */}
-          <div style={{ marginTop: "32px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
-              📊 소재 월별 현황 (최근 12개월)
-            </h3>
-            <div
-              style={{
-                background: "#f9fafb",
-                padding: "16px",
-                borderRadius: "8px",
-                height: "350px",
-              }}
-            >
-              {sojaeMonthlyData.labels.length > 0 ? (
-                <BarChartComponent data={sojaeMonthlyData} options={sojaeChartOptions as any} />
-              ) : (
-                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
-                  소재 데이터를 불러올 수 없습니다
-                </div>
-              )}
-            </div>
-          </div>
-          </>)}
         </div>
       </div>
     </div>
