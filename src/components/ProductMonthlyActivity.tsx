@@ -1,11 +1,12 @@
 "use client";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement,
   BarController, LineController, Tooltip, Legend,
 } from "chart.js";
 import { Chart } from "react-chartjs-2";
 import type { PidMonthly } from "@/lib/useSheetData";
+import { fetchGmax, aggregateGmaxRange, GmaxData } from "@/lib/gmax";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, BarController, LineController, Tooltip, Legend);
 
@@ -13,6 +14,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 //  - 샘플출고수: GMV | by Product 시트의 해당 PID '샘플출고수' 일별 값 → 월 합계
 //  - 신규/매출 소재: GMV | 소재 시트의 해당 PID 월 행 (PID가 없으면 SKU)
 //  - 세 지표 모두 같은 축(같은 눈금)으로 표시 · 작은 값은 아래 숫자 표로 확인
+//  - 맨 아래 ROAS(텍스트) = Gmax ads | by Product 시트의 해당 PID 월 GMV ÷ Ads spend
 
 const C_NEW = "#8b5cf6";
 const C_SALES = "#ec4899";
@@ -28,6 +30,8 @@ interface Props {
 }
 
 export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData }: Props) {
+  const [gmax, setGmax] = useState<GmaxData | null>(null);
+  useEffect(() => { fetchGmax().then(setGmax).catch(() => {}); }, []);
   const rows = useMemo(() => {
     const map: Record<string, { smp: number; newV: number; sales: number }> = {}; // "2609" → 값
     const get = (k: string) => (map[k] ||= { smp: 0, newV: 0, sales: 0 });
@@ -63,6 +67,15 @@ export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData
   }
 
   const labels = rows.map(r => (r.partial ? `${r.label}(진행 중)` : r.label));
+
+  // 월별 ROAS (Gmax 광고 시트, 이 PID — PID가 없으면 SKU)
+  const roas = rows.map(r => {
+    if (!gmax) return null;
+    const ym = `20${r.key.slice(0, 2)}-${r.key.slice(2, 4)}`;
+    const hit = aggregateGmaxRange(gmax, `${ym}-01`, `${ym}-31`).filter(g => (/^\d{15,}$/.test(pid) ? g.pid === pid : g.sku === sku));
+    const gmv = hit.reduce((a, g) => a + g.gmv, 0), ads = hit.reduce((a, g) => a + g.ads, 0);
+    return ads > 0 ? gmv / ads : null;
+  });
   const data = {
     labels,
     datasets: [
@@ -113,11 +126,17 @@ export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData
             <tr><td style={{ ...td, textAlign: "left", whiteSpace: "nowrap" }}>{dot(C_SMP)}샘플출고수</td>{rows.map(r => <td key={r.key} style={td}>{r.smp.toLocaleString("ko-KR")}</td>)}</tr>
             <tr><td style={{ ...td, textAlign: "left", whiteSpace: "nowrap" }}>{dot(C_NEW)}신규 소재</td>{rows.map(r => <td key={r.key} style={td}>{r.newV.toLocaleString("ko-KR")}</td>)}</tr>
             <tr><td style={{ ...td, textAlign: "left", whiteSpace: "nowrap" }}>{dot(C_SALES)}매출 소재</td>{rows.map(r => <td key={r.key} style={td}>{r.sales.toLocaleString("ko-KR")}</td>)}</tr>
+            {/* ROAS — 그래프 없이 숫자만 */}
+            <tr title="Gmax ads | by Product 시트: 월 GMV ÷ Ads spend">
+              <td style={{ ...td, textAlign: "left", whiteSpace: "nowrap", color: "#475569", fontWeight: 600, borderBottom: "none" }}>ROAS</td>
+              {rows.map((r, i) => (
+                <td key={r.key} style={{ ...td, borderBottom: "none", fontWeight: 600, color: roas[i] === null ? "#cbd5e1" : "#1f2937" }}>
+                  {roas[i] === null ? "-" : roas[i]!.toFixed(2)}
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
-      </div>
-      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-        샘플출고수 = GMV | by Product 시트 · 신규/매출 소재 = GMV | 소재 시트 · 세 지표 모두 같은 눈금
       </div>
     </div>
   );
