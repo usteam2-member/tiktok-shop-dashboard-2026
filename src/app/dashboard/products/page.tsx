@@ -206,6 +206,7 @@ export default function ProductsPage() {
           product={selectedProduct}
           dailyData={data.daily}
           sojaeData={data?.sojae || []}
+          productDaily={data?.productDaily}
           onClose={() => setSelectedProduct(null)}
         />
       )}

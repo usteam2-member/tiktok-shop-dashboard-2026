@@ -2,6 +2,11 @@
 import { useMemo } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from "chart.js";
 import { Line as LineChartComponent, Bar as BarChartComponent } from "react-chartjs-2";
+import ProductMonthlyActivity from "./ProductMonthlyActivity";
+import type { ProductDaily } from "@/lib/useSheetData";
+
+// 새 통합 그래프(월별 샘플출고수 + 신규/매출 소재)를 먼저 적용해 보는 SKU — 확인 후 전체 적용
+const MERGED_PREVIEW_SKUS = ["SB0941_US"];
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend);
 
@@ -25,10 +30,11 @@ interface ProductDetailModalProps {
   };
   dailyData: DailyRow[];
   sojaeData?: SojaeRow[];
+  productDaily?: ProductDaily;
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ product, dailyData, sojaeData = [], onClose }: ProductDetailModalProps) {
+export default function ProductDetailModal({ product, dailyData, sojaeData = [], productDaily, onClose }: ProductDetailModalProps) {
   // sojae 데이터 구조 확인 (처음 한 번만)
   useMemo(() => {
     if (sojaeData && sojaeData.length > 0) {
@@ -532,6 +538,17 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
             </div>
           </div>
 
+          {MERGED_PREVIEW_SKUS.includes(product.sku) ? (
+            /* 통합: 월별 샘플출고수 + 신규 소재 + 매출 소재 */
+            <div>
+              <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
+                📦 월별 샘플출고수 & 🎬 신규·매출 소재
+              </h3>
+              <div style={{ background: "#f9fafb", padding: "16px", borderRadius: "8px" }}>
+                <ProductMonthlyActivity sku={product.sku} productDaily={productDaily} sojaeData={sojaeData as any} />
+              </div>
+            </div>
+          ) : (<>
           {/* 주간 매출액 & 샘플 출고수 */}
           <div>
             <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
@@ -577,6 +594,7 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
               )}
             </div>
           </div>
+          </>)}
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ interface SojaeRow {
 // 제품별 일별 매출 — "GMV | by Product" 시트의 각 제품 '매출액(KRW)' 열
 export interface ProductDaily {
   products: { sku: string; name: string }[];              // 표시 이름에 (단품)/(번들) 포함
-  days: { date: string; rev: number[]; ord: number[] }[]; // date = "YYYY-MM-DD", 배열 순서 = products 순서
+  days: { date: string; rev: number[]; ord: number[]; smp: number[] }[]; // date = "YYYY-MM-DD", 배열 순서 = products 순서 (smp = 샘플출고수)
 }
 
 export interface TopProduct {
@@ -301,11 +301,13 @@ function buildProductDaily(sheet: ProductSheet): ProductDaily {
   const days = sheet.days.map(d => {
     const rev = new Array(skus.length).fill(0);
     const ord = new Array(skus.length).fill(0);
+    const smp = new Array(skus.length).fill(0);
     for (const b of sheet.blocks) {
       rev[idx[b.sku]] += safeNum(d.row[b.col]);     // 매출액(KRW)
       ord[idx[b.sku]] += safeNum(d.row[b.col + 1]); // 주문수
+      smp[idx[b.sku]] += safeNum(d.row[b.col + 2]); // 샘플출고수
     }
-    return { date: d.date, rev, ord };
+    return { date: d.date, rev, ord, smp };
   });
 
   return { products: skus.map(s => ({ sku: s, name: names[s] })), days };
