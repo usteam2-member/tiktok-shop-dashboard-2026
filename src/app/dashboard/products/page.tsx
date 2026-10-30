@@ -32,7 +32,7 @@ export default function ProductsPage() {
       return {
         name: `${p.name} ${productType}`.trim(),
         sku: p.sku,
-        pid: p.sku, // 또는 다른 PID 필드가 있다면 사용
+        pid: p.pid, // TikTok 상품 ID (리스팅). 같은 SKU라도 리스팅마다 따로 표시
         type: productType,
       };
     });
@@ -206,7 +206,7 @@ export default function ProductsPage() {
           product={selectedProduct}
           dailyData={data.daily}
           sojaeData={data?.sojae || []}
-          productDaily={data?.productDaily}
+          pidMonthly={data?.pidMonthly}
           onClose={() => setSelectedProduct(null)}
         />
       )}

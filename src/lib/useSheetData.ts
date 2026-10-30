@@ -61,6 +61,7 @@ export interface SheetData {
   anomaliesByDate: Record<string, { increases: AnomalyItem[]; decreases: AnomalyItem[] }>;
   productDailyRows: string[][]; // productDaily 시트의 원본 데이터
   productDaily: ProductDaily;   // 제품별 일별 매출/주문 (기간 필터용)
+  pidMonthly: PidMonthly;       // PID(리스팅)별 월 매출·주문·샘플 (제품별 상세정보용)
   updatedAt: string;
 }
 
@@ -140,7 +141,7 @@ function parseDailyData(rows: string[][]): DailyRow[] {
 //  - 헤더 행(SKU / 제품명 / 매출액·주문수·샘플출고수)을 위치가 아니라 내용으로 찾음
 //  - 날짜 행(B열 YYMMDD)만 사용 → 월 합계 행(2601 등)과 '마감 예상' 행은 자동 제외
 // ─────────────────────────────────────────────────────────────
-interface ProductBlock { col: number; sku: string; name: string; }
+interface ProductBlock { col: number; sku: string; name: string; pid: string; }
 interface ProductDay { date: string; row: string[]; } // date = "YYYY-MM-DD"
 interface ProductSheet { blocks: ProductBlock[]; days: ProductDay[]; latest: string; }
 
@@ -185,6 +186,8 @@ function parseProductSheet(rows: string[][]): ProductSheet {
 
   const labelRow = rows[labelIdx];
   const skuRow = skuIdx >= 0 ? rows[skuIdx] : [];
+  // PID 행 = 라벨 행 위에서 긴 숫자(상품 ID)가 처음 나오는 행
+  const pidRow = rows.slice(0, labelIdx).find(r => r.some(v => /^\d{15,}$/.test((v || "").trim()))) || [];
   const nameRow = nameIdx >= 0 ? rows[nameIdx] : [];
 
   const blocks: ProductBlock[] = [];
@@ -195,7 +198,8 @@ function parseProductSheet(rows: string[][]): ProductSheet {
       .find(v => SKU_RE.test(v)) || "";
     if (!sku) continue;
     const name = (nameRow[c] || "").trim() || sku;
-    blocks.push({ col: c, sku, name });
+    const pid = [pidRow[c], pidRow[c + 1], pidRow[c + 2]].map(v => (v || "").trim()).find(v => /^\d{15,}$/.test(v)) || "";
+    blocks.push({ col: c, sku, name, pid });
   }
 
   // 4) 날짜 행만 수집 (B열 우선, 없으면 C열)
@@ -313,16 +317,42 @@ function buildProductDaily(sheet: ProductSheet): ProductDaily {
   return { products: skus.map(s => ({ sku: s, name: names[s] })), days };
 }
 
+// 제품 목록 = PID(리스팅) 단위. PID가 없는 열은 SKU로 대신
+export interface MonthStat { rev: number; ord: number; smp: number; }
+export interface PidMonthly {
+  months: Record<string, Record<string, MonthStat>>; // PID(없으면 SKU) → "2609" → 값
+  lastDate: Record<string, string>;                   // PID → 값이 있는 마지막 날짜 ("YYYY-MM-DD")
+}
+
+// PID별 월 합계 (날짜 행만 합산 → 월 합계·마감 예상 행은 제외)
+function buildPidMonthly(sheet: ProductSheet): PidMonthly {
+  const out: PidMonthly = { months: {}, lastDate: {} };
+  for (const b of sheet.blocks) {
+    const key = b.pid || b.sku;
+    const m = (out.months[key] ||= {});
+    for (const d of sheet.days) {
+      const rev = safeNum(d.row[b.col]), ord = safeNum(d.row[b.col + 1]), smp = safeNum(d.row[b.col + 2]);
+      if (!rev && !ord && !smp) continue;
+      const k = d.date.slice(2, 4) + d.date.slice(5, 7);
+      const s = (m[k] ||= { rev: 0, ord: 0, smp: 0 });
+      s.rev += rev; s.ord += ord; s.smp += smp;
+      if (!out.lastDate[key] || d.date > out.lastDate[key]) out.lastDate[key] = d.date;
+    }
+  }
+  return out;
+}
+
 function buildProducts(sheet: ProductSheet): ProductRow[] {
   const seen = new Set<string>();
   const products: ProductRow[] = [];
   for (const b of sheet.blocks) {
-    if (seen.has(b.sku)) continue;
-    seen.add(b.sku);
+    const key = b.pid || b.sku;
+    if (seen.has(key)) continue;
+    seen.add(key);
     products.push({
       name: b.name,
       sku: b.sku,
-      pid: b.sku,
+      pid: key,
       productType: getProductType(b.sku),
       totalRevenue: 0,
       ordToday: 0,
@@ -348,11 +378,13 @@ function parseSojaeData(rows: string[][]): SojaeRow[] {
   const skuRow = rows[1];
   const productsRow = rows[2];
 
-  const skuBlocks: Array<{ skuIdx: number; sku: string; productName: string }> = [];
+  const pidRow = rows[0] || [];
+  const skuBlocks: Array<{ skuIdx: number; sku: string; pid: string; productName: string }> = [];
   for (let colIdx = 2; colIdx < (skuRow?.length || 0); colIdx += 4) {
     const sku = skuRow[colIdx]?.trim();
     if (!sku) continue;
-    skuBlocks.push({ skuIdx: colIdx, sku, productName: productsRow?.[colIdx]?.trim() || "" });
+    const pid = (pidRow[colIdx] || "").trim();
+    skuBlocks.push({ skuIdx: colIdx, sku, pid: /^\d{15,}$/.test(pid) ? pid : "", productName: productsRow?.[colIdx]?.trim() || "" });
   }
 
   for (let rowIdx = 4; rowIdx < rows.length; rowIdx++) {
@@ -366,7 +398,7 @@ function parseSojaeData(rows: string[][]): SojaeRow[] {
       const makingSales = safeNum(row[block.skuIdx + 2]);
       const gmv = safeNum(row[block.skuIdx + 3]);
       if (totalVideo > 0 || newVideo > 0 || makingSales > 0 || gmv > 0) {
-        result.push({ dt, sku: block.sku, productName: block.productName, totalVideo, newVideo, makingSales, gmv });
+        result.push({ dt, sku: block.sku, pid: block.pid, productName: block.productName, totalVideo, newVideo, makingSales, gmv });
       }
     });
   }
@@ -396,6 +428,7 @@ export function useSheetData() {
         const products = buildProducts(productSheet);
         const productTop10ByPeriod = buildTop10(productSheet);
         const productDaily = buildProductDaily(productSheet);
+        const pidMonthly = buildPidMonthly(productSheet);
         const anomaliesByDate = buildAnomalies(productDaily);
         const sojae = parseSojaeData(sojaeRows);
 
@@ -411,6 +444,7 @@ export function useSheetData() {
           anomaliesByDate,
           productDailyRows,
           productDaily,
+          pidMonthly,
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {

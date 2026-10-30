@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from "chart.js";
 import { Line as LineChartComponent, Bar as BarChartComponent } from "react-chartjs-2";
 import ProductMonthlyActivity from "./ProductMonthlyActivity";
-import type { ProductDaily } from "@/lib/useSheetData";
+import type { PidMonthly } from "@/lib/useSheetData";
 
 // 새 통합 그래프(월별 샘플출고수 + 신규/매출 소재)를 먼저 적용해 보는 SKU — 확인 후 전체 적용
 const MERGED_PREVIEW_SKUS = ["SB0941_US"];
@@ -30,11 +30,11 @@ interface ProductDetailModalProps {
   };
   dailyData: DailyRow[];
   sojaeData?: SojaeRow[];
-  productDaily?: ProductDaily;
+  pidMonthly?: PidMonthly;
   onClose: () => void;
 }
 
-export default function ProductDetailModal({ product, dailyData, sojaeData = [], productDaily, onClose }: ProductDetailModalProps) {
+export default function ProductDetailModal({ product, dailyData, sojaeData = [], pidMonthly, onClose }: ProductDetailModalProps) {
   // sojae 데이터 구조 확인 (처음 한 번만)
   useMemo(() => {
     if (sojaeData && sojaeData.length > 0) {
@@ -84,68 +84,27 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
     return false;
   };
 
-  // 월별 데이터 집계
+  // 월별 매출액 — 해당 PID(리스팅)의 매출 (GMV | by Product 시트 날짜 행 합계)
   const monthlyData = useMemo(() => {
-    console.log(`📊 [Modal] Aggregating data for: ${product.sku}`);
-    console.log(`📊 [Modal] dailyData length: ${dailyData.length}`);
-    
-    const monthMap: Record<string, number> = {};
-    let validCount = 0;
-
-    dailyData.forEach((row, idx) => {
-      const dt = row.dt;
-      const krw = row.krw;
-
-      // 날짜 검증
-      if (!isValidDate(dt)) {
-        if (idx < 5) console.log(`  Row ${idx}: Invalid date "${dt}"`);
-        return;
-      }
-
-      const krwNum = parseFloat(String(krw)) || 0;
-      if (krwNum <= 0) return;
-
-      // 날짜를 월로 변환
-      const dtStr = String(dt);
-      let monthKey = "";
-      
-      if (dtStr.length === 8) {
-        monthKey = dtStr.substring(2, 6); // "20260804" → "2608"
-      } else if (dtStr.includes("-")) {
-        const parts = dtStr.split("-");
-        monthKey = parts[0].substring(2) + parts[1]; // "2026-08" → "2608"
-      }
-
-      if (!monthMap[monthKey]) {
-        monthMap[monthKey] = 0;
-      }
-      monthMap[monthKey] += krwNum;
-      validCount++;
-
-      if (validCount <= 3) {
-        console.log(`  Valid row ${idx}: ${dt} → ${monthKey}, krw=${krwNum}`);
-      }
-    });
-
-    console.log(`📊 [Modal] Valid rows: ${validCount}`);
-    console.log("📊 [Modal] Month map:", monthMap);
-
-    const sorted = Object.entries(monthMap)
+    const months = pidMonthly?.months[product.pid] || {};
+    const last = pidMonthly?.lastDate[product.pid] || "";
+    const sorted = Object.entries(months)
+      .filter(([, v]) => v.rev > 0)
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-12)
-      .map(([month, revenue]) => ({
-        month,
-        revenue,
-      }));
-
-    console.log("📊 [Modal] Final monthly data:", sorted);
+      .slice(-12);
+    const multiYear = new Set(sorted.map(([k]) => k.slice(0, 2))).size > 1;
+    const lastKey = last ? last.slice(2, 4) + last.slice(5, 7) : "";
+    const lastDay = last ? parseInt(last.slice(8, 10)) : 0;
+    const dim = last ? new Date(Date.UTC(+last.slice(0, 4), +last.slice(5, 7), 0)).getUTCDate() : 0;
+    const label = (k: string) =>
+      `${multiYear ? `${k.slice(0, 2)}년 ` : ""}${parseInt(k.slice(2))}월${k === lastKey && lastDay < dim ? "(진행 중)" : ""}`;
 
     return {
-      labels: sorted.map((d) => d.month),
+      labels: sorted.map(([k]) => label(k)),
       datasets: [
         {
           label: "매출액 (₩)",
-          data: sorted.map((d) => d.revenue),
+          data: sorted.map(([, v]) => v.rev),
           borderColor: "#3b82f6",
           backgroundColor: "rgba(59, 130, 246, 0.1)",
           borderWidth: 2,
@@ -156,7 +115,7 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
         },
       ],
     };
-  }, [dailyData, product.sku, isValidDate]);
+  }, [pidMonthly, product.pid]);
 
   // 주간 데이터 + 샘플 출고수
   const weeklyAndSampleData = useMemo(() => {
@@ -518,7 +477,7 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
           {/* 월별 매출액 */}
           <div style={{ marginBottom: "32px" }}>
             <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: "16px", color: "#1f2937" }}>
-              📊 월별 매출액 (최근 12개월)
+              📊 월별 매출액 (이 PID · 최근 12개월)
             </h3>
             <div
               style={{
@@ -545,7 +504,7 @@ export default function ProductDetailModal({ product, dailyData, sojaeData = [],
                 📦 월별 샘플출고수 & 🎬 신규·매출 소재
               </h3>
               <div style={{ background: "#f9fafb", padding: "16px", borderRadius: "8px" }}>
-                <ProductMonthlyActivity sku={product.sku} productDaily={productDaily} sojaeData={sojaeData as any} />
+                <ProductMonthlyActivity pid={product.pid} sku={product.sku} pidMonthly={pidMonthly} sojaeData={sojaeData as any} />
               </div>
             </div>
           ) : (<>
