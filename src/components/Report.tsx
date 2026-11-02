@@ -143,8 +143,8 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
                 <div style={{ color: "#1c1917", fontWeight: 600 }}>{r.curQty > 0 ? fmtQty(r.curQty) : "-"}</div>
               </div>
               <div style={{ fontSize: 13, color: "#57534e", textAlign: "right", lineHeight: "22px", fontVariantNumeric: "tabular-nums" }}>
-                {prev && <div>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
-                <div style={{ color: "#1c1917", fontWeight: 600 }}>{fmtShort(r.cur)}</div>
+                {prev && <div title={r.prev > 0 ? `₩${fmtInt(r.prev)}` : undefined}>{r.prev > 0 ? fmtShort(r.prev) : "-"}</div>}
+                <div style={{ color: "#1c1917", fontWeight: 600 }} title={`₩${fmtInt(r.cur)}`}>{fmtShort(r.cur)}</div>
               </div>
               <div style={{ textAlign: "right", fontSize: 16, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: pct === null ? "#a8a29e" : pct >= 0 ? UP : DOWN }}>
                 {pct === null ? (prev ? "신규" : "-") : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct).toFixed(1)}%`}
@@ -238,7 +238,16 @@ function MonthlyMeeting({ regions }: { regions: RegionData[] }) {
   // 선택할 수 있는 달 = 어느 지역이든 데이터가 있는 달
   const monthKeys = Array.from(new Set(regions.flatMap(r => (r.months || []).map(m => m.key)))).sort();
   const [key, setKey] = useState("");
-  const selected = key || monthKeys[monthKeys.length - 1] || "";
+  // 기본 기준 월: 가장 최근 달. 단, 이번 달이 시작한 지 7일 이내면(데이터가 며칠뿐이라 마감 예상이 부정확) 지난달(마감)
+  const defaultKey = (() => {
+    const last = monthKeys[monthKeys.length - 1] || "";
+    if (!last) return "";
+    const [ly, lm] = last.split("-").map(Number);
+    const t = usToday();
+    if (isOngoing({ year: ly, month: lm }) && t.day <= 7 && monthKeys.length > 1) return monthKeys[monthKeys.length - 2];
+    return last;
+  })();
+  const selected = key || defaultKey;
   const [y, m] = selected ? selected.split("-").map(Number) : [0, 0];
   const [, pm] = selected ? prevKeyOf(selected).split("-").map(Number) : [0, 0];
 
