@@ -85,7 +85,9 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
     if (!m) continue;
     const ym = { year: 2000 + parseInt(m[1]), month: parseInt(m[2]) };
     const next = rows[i + 1] || [];
-    const hasForecast = [0, 1, 2].some(k => (next[k] || "").replace(/\s/g, "") === "마감예상");
+    // '마감 예상' 행은 진행 중인 달에만 사용. 끝난 달은 실제 누적(월 행) 값
+    //  (시트의 마감 예상 수식이 오늘 날짜 기준이라, 달이 끝난 뒤엔 실제와 달라질 수 있음)
+    const hasForecast = isOngoing(ym) && [0, 1, 2].some(k => (next[k] || "").replace(/\s/g, "") === "마감예상");
     const s = (hasForecast && toSummary(ym, next)) || toSummary(ym, rows[i]);
     if (s && !out.some(o => o.key === s.key)) out.push(s);
   }
@@ -172,12 +174,14 @@ export function parseProductMonthly(rows: string[][]): ProductMonthly {
     const km = b0.match(/^(\d{2})년(\d{1,2})월$/);
     const b = km ? `${km[1]}${km[2].padStart(2, "0")}` : b0;
     if (!/^\d{4}$/.test(b)) continue;
+    const mk = `20${b.slice(0, 2)}-${b.slice(2, 4)}`;
     const next = rows[i + 1] || [];
-    const isForecast = [0, 1, 2].some(k => clean(next[k]).replace(/\s/g, "") === "마감예상");
+    // '마감 예상' 행은 진행 중인 달에만 사용. 끝난 달은 실제 누적(월 행) 값
+    const ongoing = isOngoing({ year: 2000 + parseInt(b.slice(0, 2)), month: parseInt(b.slice(2, 4)) });
+    const isForecast = ongoing && [0, 1, 2].some(k => clean(next[k]).replace(/\s/g, "") === "마감예상");
     const src = isForecast ? next : rows[i];
     const vals = cols.map(c => num(src[c]));
     if (vals.every(v => v === 0)) continue;
-    const mk = `20${b.slice(0, 2)}-${b.slice(2, 4)}`;
     if (!(mk in revenue)) {
       revenue[mk] = vals;
       // '마감 예상' 행에 주문수가 비어 있으면 월 누적 행 값 사용

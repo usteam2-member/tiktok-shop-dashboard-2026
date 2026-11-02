@@ -158,7 +158,7 @@ function ProductCompare({ data, gmax, cur, prev, label }: { data: ProductMonthly
           );
         })}
       </div>
-      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>출처: GMV | by Product 시트의 월별 &apos;마감 예상&apos; 행 (판매수량 = 주문수) · {cur.month}월 매출 Top 10 기준</div>
+      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>출처: GMV | by Product 시트 (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) (판매수량 = 주문수) · {cur.month}월 매출 Top 10 기준</div>
     </div>
   );
 }
@@ -226,7 +226,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
         </table>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: {d.region.label} 시트 GMV | Daily의 월별 &apos;마감 예상&apos; 행 · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
+        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
       </div>
 
       <ProductCompare data={d.products} gmax={d.gmax} cur={cur} prev={prev} label={colLabel} />
@@ -403,7 +403,7 @@ function TargetCompare({ region, products }: { region: ReportRegion; products: P
         </div>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: 목표 = 매출 목표 시트 &apos;{tm}월 매출&apos;·&apos;{tm}월 판매량&apos; 열 · {pm}월 = GMV | by Product 시트 &apos;마감 예상&apos; 행 · 참고 코드(SKU)로 연결하고, 코드가 없는 품목은 이름으로 연결(&apos;이름 연결&apos; 표시)
+        출처: 목표 = 매출 목표 시트 &apos;{tm}월 매출&apos;·&apos;{tm}월 판매량&apos; 열 · {pm}월 = GMV | by Product 시트 (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · 참고 코드(SKU)로 연결하고, 코드가 없는 품목은 이름으로 연결(&apos;이름 연결&apos; 표시)
       </div>
     </div>
   );
