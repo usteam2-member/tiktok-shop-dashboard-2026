@@ -3,6 +3,7 @@
 //  객단가 = 매출액(KRW) ÷ 주문수 (같은 시트의 두 값이라 기준이 일치)
 
 import { parseCSVFull } from "./gmax";
+import { Region, REGIONS, sheetCsvUrl } from "./region";
 
 const SKU_RE = /^(SB\d+_[A-Z]+|BD\d+(_[A-Z]+)?)$/;
 const PID_RE = /^\d{15,}$/;
@@ -14,7 +15,7 @@ export interface ProductOrders {
 }
 
 const num = (v: string | undefined) => {
-  const t = (v || "").replace(/[,\s₩$%]/g, "");
+  const t = (v || "").replace(/[,\s₩$£%]/g, "");
   const n = parseFloat(t);
   return !t || t.startsWith("#") || isNaN(n) ? 0 : n;
 };
@@ -84,15 +85,14 @@ export function aovOf(s: OrderStat | undefined): number | null {
   return s && s.ord > 0 ? s.rev / s.ord : null;
 }
 
-// 미국 GMV | by Product 시트 원본 (여러 줄 셀까지 정확히 나누도록 parseCSVFull 사용)
-const PRODUCT_URL = "https://docs.google.com/spreadsheets/d/1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24/export?format=csv&gid=1578364048";
-let rowsCache: Promise<string[][]> | null = null;
-export function fetchProductRows(): Promise<string[][]> {
-  if (!rowsCache) {
-    rowsCache = fetch(PRODUCT_URL, { cache: "no-store" })
+// 지역별 GMV | by Product 시트 원본 (여러 줄 셀까지 정확히 나누도록 parseCSVFull 사용)
+const rowsCache: Record<string, Promise<string[][]>> = {};
+export function fetchProductRows(region: Region = REGIONS[0]): Promise<string[][]> {
+  if (!rowsCache[region.key]) {
+    rowsCache[region.key] = fetch(sheetCsvUrl(region.sheetId, region.productGid), { cache: "no-store" })
       .then(res => { if (!res.ok) throw new Error("제품별 시트를 불러오지 못했어요"); return res.text(); })
       .then(parseCSVFull)
-      .catch(e => { rowsCache = null; throw e; });
+      .catch(e => { delete rowsCache[region.key]; throw e; });
   }
-  return rowsCache;
+  return rowsCache[region.key];
 }

@@ -168,7 +168,7 @@ interface RegionData {
   region: ReportRegion;
   months: MonthSummary[] | null;
   products: ProductMonthly | null;
-  gmax: GmaxData | null;          // 제품별 ROI용 (미국만)
+  gmax: GmaxData | null;          // 제품별 ROI용 (지역별 Gmax 광고 시트)
   error: string | null;
 }
 
@@ -432,9 +432,9 @@ export default function Report() {
     for (const region of REGIONS) {
       fetchMonthSummaries(region).then(months => update(region.key, { months })).catch(e => update(region.key, { error: e.message }));
       fetchProductMonthly(region).then(products => update(region.key, { products })).catch(e => update(region.key, { error: e.message }));
+      // 제품별 ROI = 지역별 Gmax 광고 시트
+      fetchGmax(region).then(gmax => update(region.key, { gmax })).catch(() => {});
     }
-    // 제품별 ROI는 미국 Gmax 광고 시트만 있음
-    fetchGmax().then(gmax => update("us", { gmax })).catch(() => {});
   }, []);
 
   const body = useMemo(() => {

@@ -2,6 +2,7 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSheetData } from "@/lib/useSheetData";
+import { useRegion, withRegion } from "@/lib/region";
 import { filterByRange, dtToDate } from "@/lib/data";
 import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
@@ -27,7 +28,8 @@ function subtractDays(date: Date, days: number): Date {
 export default function DashboardPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data, loading, error } = useSheetData();
+  const region = useRegion();
+  const { data, loading, error } = useSheetData(region);
 
   const [startDate, setStartDate] = useState(searchParams.get("start") || "");
   const [endDate, setEndDate] = useState(searchParams.get("end") || "");
@@ -71,8 +73,8 @@ export default function DashboardPage() {
     const p = new URLSearchParams();
     p.set("start", s);
     p.set("end", e);
-    router.push(`/dashboard?${p.toString()}`);
-  }, [router]);
+    router.push(withRegion("/dashboard", region, p));
+  }, [router, region]);
 
   const handleQuick = (days: number | null) => {
     if (!data?.daily.length) return;
@@ -128,7 +130,7 @@ export default function DashboardPage() {
 
   // 📊 매출 Top 20은 ProductTopTable이 Gmax 광고 시트에서 같은 기간으로 집계
   const shopTotal = useMemo(() => kpiData.reduce((a, r) => a + r.krw, 0), [kpiData]);
-  // 객단가 달러 환산용 환율 = 같은 기간 총 매출(KRW) ÷ 총 매출(USD)
+  // 객단가 현지 통화 환산용 환율 = 같은 기간 총 매출(KRW) ÷ 총 매출(USD · 영국은 GBP)
   const fxRate = useMemo(() => {
     const usd = kpiData.reduce((a, r) => a + (r.usd || 0), 0);
     return usd > 0 ? shopTotal / usd : undefined;
@@ -364,7 +366,13 @@ export default function DashboardPage() {
       {/* KPI 트랙킹 탭 */}
       {activeTab === "kpi" && (
         <main style={{ flex: 1, padding: "20px", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          <KpiTracking />
+          {region.hasKpi ? (
+            <KpiTracking />
+          ) : (
+            <div style={{ padding: 16, background: "#f8fafc", border: "1px dashed #cbd5e1", color: "#64748b", borderRadius: 8, fontSize: 13 }}>
+              {region.flag} {region.label} KPI 트랙킹 시트가 아직 연결되지 않았어요 (지금은 미국 크리에이터 총괄 시트의 Performance 탭만 연결돼 있어요)
+            </div>
+          )}
         </main>
       )}
 
