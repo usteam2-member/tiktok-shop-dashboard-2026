@@ -3,27 +3,30 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchGmax, aggregateGmaxRange, lastCompleteDate, GmaxData } from "@/lib/gmax";
 import { fetchProductRows, productOrdersInRange, aovOf } from "@/lib/productOrders";
 import RankTable, { won } from "./RankTable";
+import { useRegion } from "@/lib/region";
 
 interface Props {
   startDate: string;  // "YYYY-MM-DD"
   endDate: string;
   shopTotal?: number; // 같은 기간 샵 전체 매출 (비교용)
-  fxRate?: number;    // 같은 기간 환율 (GMV | Daily 총 매출 KRW ÷ USD) — 객단가 달러 환산용
+  fxRate?: number;    // 같은 기간 환율 (GMV | Daily 총 매출 KRW ÷ 현지 통화) — 객단가 현지 통화 환산용
 }
 
 // 매출액 Top 20 — 데이터: Gmax 광고 시트의 제품별 GMV / Ads spend
 export default function ProductTopTable({ startDate, endDate, shopTotal, fxRate }: Props) {
+  const region = useRegion();
   const [data, setData] = useState<GmaxData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [prodRows, setProdRows] = useState<string[][] | null>(null);
 
   useEffect(() => {
-    fetchGmax().then(setData).catch(e => setError(e.message));
-    fetchProductRows().then(setProdRows).catch(() => setProdRows([])); // 실패해도 표는 표시 (객단가만 "-")
-  }, []);
+    setData(null); setError(null); setProdRows(null);
+    fetchGmax(region).then(setData).catch(e => setError(e.message));
+    fetchProductRows(region).then(setProdRows).catch(() => setProdRows([])); // 실패해도 표는 표시 (객단가만 "-")
+  }, [region]);
 
-  // 객단가 = GMV | by Product 시트의 같은 기간 매출액(KRW) ÷ 주문수 → 환율로 달러 환산
+  // 객단가 = GMV | by Product 시트의 같은 기간 매출액(KRW) ÷ 주문수 → 환율로 현지 통화 환산
   const orders = useMemo(
     () => (prodRows ? productOrdersInRange(prodRows, startDate, endDate) : null),
     [prodRows, startDate, endDate]
@@ -31,7 +34,7 @@ export default function ProductTopTable({ startDate, endDate, shopTotal, fxRate 
   const aovUsd = (pid: string, sku: string): string | undefined => {
     if (!orders || !fxRate || fxRate <= 0) return undefined;
     const krw = aovOf((pid && orders.byPid[pid]) || (sku ? orders.bySku[sku] : undefined));
-    return krw === null ? undefined : "$" + (krw / fxRate).toFixed(2);
+    return krw === null ? undefined : region.symbol + (krw / fxRate).toFixed(2);
   };
 
   const top = useMemo(() => {
@@ -63,8 +66,8 @@ export default function ProductTopTable({ startDate, endDate, shopTotal, fxRate 
       emptyText="이 기간에 매출 데이터가 없어요"
       footer={
         <>
-          객단가(USD) = GMV | by Product 시트의 같은 기간 매출액 ÷ 주문수
-          {fxRate ? ` · 환율 ₩${Math.round(fxRate).toLocaleString("ko-KR")}/$ (같은 기간 총 매출 KRW ÷ USD)` : ""}
+          객단가({region.currency}) = GMV | by Product 시트의 같은 기간 매출액 ÷ 주문수
+          {fxRate ? ` · 환율 ₩${Math.round(fxRate).toLocaleString("ko-KR")}/${region.symbol} (같은 기간 총 매출 KRW ÷ ${region.currency})` : ""}
           {lastDate && endDate > lastDate && (
             <div>Gmax 광고 시트는 {lastDate}까지 모든 제품이 입력돼 있어요. 이후 날짜는 일부 제품만 반영될 수 있어요.</div>
           )}

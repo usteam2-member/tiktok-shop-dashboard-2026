@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Chart, registerables } from "chart.js";
 import RankTable from "./RankTable";
+import { useRegion } from "@/lib/region";
 import { fetchGmax, aggregateGmax, rankCorrelation, lastCompleteDate, completeDates, GmaxData, GmaxRow } from "@/lib/gmax";
 
 Chart.register(...registerables);
@@ -30,6 +31,7 @@ const card: React.CSSProperties = {
 };
 
 export default function GmaxAds() {
+  const region = useRegion();
   const [data, setData] = useState<GmaxData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"daily" | "monthly">("daily");
@@ -37,7 +39,8 @@ export default function GmaxAds() {
   const [month, setMonth] = useState("");
 
   useEffect(() => {
-    fetchGmax()
+    setData(null); setError(null);
+    fetchGmax(region)
       .then(d => {
         setData(d);
         // 기본 선택 = 모든 제품 입력이 끝난 가장 최근 날짜
@@ -46,7 +49,7 @@ export default function GmaxAds() {
         setMonth(lastDate.slice(0, 7));
       })
       .catch(e => setError(e.message));
-  }, []);
+  }, [region]);
 
   const dates = useMemo(() => (data ? data.days.map(d => d.date).reverse() : []), [data]);
   const complete = useMemo(() => (data ? completeDates(data) : new Set<string>()), [data]);

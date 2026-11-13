@@ -7,6 +7,7 @@ import {
 import { Chart } from "react-chartjs-2";
 import type { PidMonthly } from "@/lib/useSheetData";
 import { fetchGmax, aggregateGmaxRange, GmaxData } from "@/lib/gmax";
+import { useRegion } from "@/lib/region";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, BarController, LineController, Tooltip, Legend);
 
@@ -30,9 +31,10 @@ interface Props {
 }
 
 export default function ProductMonthlyActivity({ pid, sku, pidMonthly, sojaeData }: Props) {
+  const region = useRegion();
   const [gmax, setGmax] = useState<GmaxData | null>(null);
   const [gmaxErr, setGmaxErr] = useState("");
-  useEffect(() => { fetchGmax().then(setGmax).catch(e => setGmaxErr(e?.message || "Gmax 광고 시트를 불러오지 못했어요")); }, []);
+  useEffect(() => { fetchGmax(region).then(setGmax).catch(e => setGmaxErr(e?.message || "Gmax 광고 시트를 불러오지 못했어요")); }, [region]);
   const rows = useMemo(() => {
     const map: Record<string, { smp: number; newV: number; sales: number }> = {}; // "2609" → 값
     const get = (k: string) => (map[k] ||= { smp: 0, newV: 0, sales: 0 });

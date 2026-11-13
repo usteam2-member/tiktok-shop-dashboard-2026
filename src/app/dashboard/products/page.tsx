@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { useSheetData } from "@/lib/useSheetData";
+import { useRegion } from "@/lib/region";
 import Navbar from "@/components/Navbar";
 import TabBar from "@/components/TabBar";
 import ProductDetailModal from "@/components/ProductDetailModal";
@@ -13,7 +14,8 @@ interface ProductItem {
 }
 
 export default function ProductsPage() {
-  const { data, loading, error } = useSheetData();
+  const region = useRegion();
+  const { data, loading, error } = useSheetData(region);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 

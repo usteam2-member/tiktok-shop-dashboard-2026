@@ -1,5 +1,6 @@
 "use client";
 import { useRouter, usePathname } from "next/navigation";
+import { useRegion, withRegion } from "@/lib/region";
 
 const TABS = [
   { icon: "📊", label: "대시보드", href: "/dashboard" },
@@ -13,6 +14,7 @@ interface Props {
 export default function TabBar({ activeTab }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const region = useRegion(); // 페이지를 옮겨도 지역 유지
 
   return (
     <div style={{ display: "flex", borderBottom: "3px solid #e5e7eb", background: "var(--card)", padding: "0" }}>
@@ -34,7 +36,7 @@ export default function TabBar({ activeTab }: Props) {
         return (
           <div
             key={t.label}
-            onClick={() => router.push(t.href)}
+            onClick={() => router.push(withRegion(t.href, region))}
             style={{
               padding: "10px 20px",
               display: "flex",
