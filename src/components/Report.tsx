@@ -30,18 +30,19 @@ const METRICS: Metric[] = [
 ];
 
 // 증감: ↑ 초록 / ↓ 빨강 + 크기만큼 막대 (60% 이상이면 가득)
+// 모든 행이 같은 폭(글자 칸 + 막대 칸)이라 숫자·막대·'-'가 한 줄로 맞춰짐
 function Change({ pct }: { pct: number | null }) {
-  if (pct === null || !isFinite(pct)) return <span style={{ color: "#cbd5e1" }}>-</span>;
-  const up = pct >= 0;
-  const color = up ? UP : DOWN;
-  const width = Math.max(3, Math.min(1, Math.abs(pct) / 60) * 120);
+  const none = pct === null || !isFinite(pct);
+  const up = !none && pct! >= 0;
+  const color = none ? "#cbd5e1" : up ? UP : DOWN;
+  const width = none ? 0 : Math.max(3, Math.min(1, Math.abs(pct!) / 60) * 120);
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12 }}>
-      <span style={{ color, fontWeight: 700, fontSize: 15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-        {up ? "↑" : "↓"} {Math.abs(pct).toFixed(1)}%
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 12, width: 210 }}>
+      <span style={{ width: 78, textAlign: "right", color, fontWeight: 700, fontSize: 15, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+        {none ? "-" : `${up ? "↑" : "↓"} ${Math.abs(pct!).toFixed(1)}%`}
       </span>
       <span style={{ width: 120, display: "flex" }}>
-        <span style={{ width, height: 6, borderRadius: 3, background: color }} />
+        {!none && <span style={{ width, height: 6, borderRadius: 3, background: color }} />}
       </span>
     </div>
   );
@@ -212,7 +213,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
               <th style={{ ...th, textAlign: "right" }}>{prev ? colLabel(prev) : "전월"}</th>
               <th style={{ ...th, textAlign: "right" }}>{colLabel(cur)}</th>
               {showShare && <th style={{ ...th, textAlign: "right" }} title="채널별 매출 ÷ 총 매출">채널 비중</th>}
-              <th style={{ ...th, textAlign: "right" }}>증감({prev ? prev.month : "-"}→{cur.month}월)</th>
+              <th style={{ ...th, textAlign: "center" }}>증감({prev ? prev.month : "-"}→{cur.month}월)</th>
             </tr>
           </thead>
           <tbody>
@@ -229,7 +230,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", color: "#57534e" }}>{a === null ? "-" : mt.fmt(a)}</td>
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", fontWeight: mt.sub ? 600 : 700, color: "#1c1917" }}>{b === null ? "-" : mt.fmt(b)}</td>
                   {showShare && <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", color: mt.sub ? "#2563eb" : "#78716c", fontWeight: mt.sub ? 700 : 500 }}>{share}</td>}
-                  <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right" }}><Change pct={pct} /></td>
+                  <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "center" }}><Change pct={pct} /></td>
                 </tr>
               );
             })}
