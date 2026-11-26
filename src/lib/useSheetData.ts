@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { DailyRow, ProductRow, ProductTop10Item, ProductDailySeries, getProductType } from "./data";
 import { parseCSVFull } from "./gmax";
-
-const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
-const GID_DAILY = "1032420248"; // 매출 raw 시트 (J열 = 매출액 KRW)
-const GID_PRODUCT = "1578364048";
-const GID_SOJAE = "367495503";
+import { Region, sheetCsvUrl } from "./region";
 
 // SojaeRow 타입 재정의 (data.ts의 것 대신)
 interface SojaeRow {
@@ -88,22 +84,44 @@ function parseCSV(text: string): string[][] {
 // "79,322" / "₩1,234" / "#DIV/0!" 등을 안전하게 숫자로 변환
 function safeNum(v: string | undefined): number {
   if (!v) return 0;
-  const n = parseFloat(v.replace(/[,\s₩$%#]/g, ""));
+  const n = parseFloat(v.replace(/[,\s₩$£%#]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
-async function fetchSheet(gid: string) {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to fetch sheet ${gid}`);
-  return parseCSV(await res.text());
+async function fetchSheet(region: Region, gid: string) {
+  const res = await fetch(sheetCsvUrl(region.sheetId, gid), { cache: "no-store" });
+  const text = res.ok ? await res.text() : "";
+  // 비공개 시트는 로그인 HTML이 돌아옴
+  if (!res.ok || /^\s*<(!doctype|html)/i.test(text)) {
+    throw new Error(`${region.label} 시트(gid ${gid})를 불러오지 못했어요 — '링크가 있는 모든 사용자 보기'로 공유돼 있는지 확인해 주세요`);
+  }
+  return parseCSV(text);
 }
 
 // ─────────────────────────────────────────────────────────────
 // GMV | Daily
 // ─────────────────────────────────────────────────────────────
-function parseDailyData(rows: string[][]): DailyRow[] {
+// 열 위치는 헤더 이름으로 찾음 (영국 시트는 '인플 Flat Fee' 열이 없어서 ROAS·객단가 위치가 한 칸씩 당겨져 있음)
+//  찾지 못하면 미국 시트 기본 위치 사용
+function parseDailyData(rows: string[][], minDate = ""): DailyRow[] {
   if (rows.length < 3) return [];
+
+  const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "").toLowerCase();
+  const header = rows.slice(0, 10).find(r => r.some(c => norm(c) === "orders") && r.some(c => norm(c) === "총매출(krw)")) || [];
+  const col = (test: (h: string) => boolean, fallback: number) => {
+    const i = header.findIndex(c => test(norm(c)));
+    return i >= 0 ? i : fallback;
+  };
+  const C = {
+    aff: col(h => h === "affiliateupload", 4),
+    smp: col(h => h === "sampleorders", 5),
+    ord: col(h => h === "orders", 6),
+    local: col(h => /^총매출\((usd|gbp|eur)\)$/.test(h), 8),  // 총 매출(현지 통화)
+    krw: col(h => h === "총매출(krw)", 9),
+    adCost: col(h => h === "totaladsspend" || h === "전체광고비", 11),
+    roas: col(h => h === "roas", 16),
+    aov: col(h => /^객단가\((usd|gbp|eur)\)$/.test(h), 18),
+  };
 
   const result: DailyRow[] = [];
 
@@ -116,19 +134,24 @@ function parseDailyData(rows: string[][]): DailyRow[] {
     if (!dt || dt.length !== 6 || isNaN(parseInt(dt))) continue;
 
     dt = `20${dt.slice(0, 2)}${dt.slice(2, 4)}${dt.slice(4, 6)}`;
+    if (minDate && dt < minDate) continue;
 
     result.push({
       dt,
-      aff: safeNum(row[4]),
-      smp: safeNum(row[5]),
-      ord: safeNum(row[6]),
-      usd: safeNum(row[8]),     // I열: 총 매출(USD)
-      krw: safeNum(row[9]),     // J열: 총 매출(KRW)
-      adCost: safeNum(row[11]), // L열: Total ads spend (ROAS 계산 기준과 동일)
-      roas: safeNum(row[16]),   // Q열: ROAS (%)
-      unitPriceUsd: safeNum(row[18]), // S열: 객단가(USD)
+      aff: safeNum(row[C.aff]),
+      smp: safeNum(row[C.smp]),
+      ord: safeNum(row[C.ord]),
+      usd: safeNum(row[C.local]),     // 총 매출(현지 통화: 미국 USD · 영국 GBP)
+      krw: safeNum(row[C.krw]),       // 총 매출(KRW)
+      adCost: safeNum(row[C.adCost]), // Total ads spend (ROAS 계산 기준과 동일)
+      roas: safeNum(row[C.roas]),     // ROAS (%)
+      unitPriceUsd: safeNum(row[C.aov]), // 객단가(현지 통화)
     });
   }
+
+  // 매출이 처음 생긴 날 이전(아직 샵 운영 전) 행은 버림
+  const firstValidIdx = result.findIndex(r => r.krw > 0);
+  if (firstValidIdx > 0) result.splice(0, firstValidIdx);
 
   let lastValidIdx = -1;
   for (let i = result.length - 1; i >= 0; i--) {
@@ -465,28 +488,31 @@ export function parseSojaeData(rows: string[][]): SojaeRow[] {
 }
 
 // ─────────────────────────────────────────────────────────────
-export function useSheetData() {
+export function useSheetData(region: Region) {
   const [data, setData] = useState<SheetData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false; // 지역을 바꾸면 이전 지역 응답은 버림
     (async () => {
       try {
         setLoading(true);
         setError(null);
+        setData(null);
 
         const [dailyRows, productDailyRows, sojaeRows] = await Promise.all([
-          fetchSheet(GID_DAILY),
-          fetchSheet(GID_PRODUCT).catch(() => [] as string[][]),
+          fetchSheet(region, region.dailyGid),
+          fetchSheet(region, region.productGid).catch(() => [] as string[][]),
           // 소재 시트는 헤더에 줄바꿈 셀이 있어서 따옴표 안 줄바꿈까지 처리하는 parseCSVFull 사용
-          fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_SOJAE}`, { cache: "no-store" })
+          fetch(sheetCsvUrl(region.sheetId, region.sojaeGid), { cache: "no-store" })
             .then(r => (r.ok ? r.text() : ""))
             .then(t => (t ? parseCSVFull(t) : []))
             .catch(() => [] as string[][]),
         ]);
+        if (cancelled) return;
 
-        const daily = parseDailyData(dailyRows);
+        const daily = parseDailyData(dailyRows, region.minDate);
         const productSheet = parseProductSheet(productDailyRows);
         const products = buildProducts(productSheet);
         const productTop10ByPeriod = buildTop10(productSheet);
@@ -511,13 +537,15 @@ export function useSheetData() {
           updatedAt: new Date().toISOString(),
         });
       } catch (err) {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : "Unknown error");
         setData(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => { cancelled = true; };
+  }, [region]);
 
   return { data, loading, error };
 }

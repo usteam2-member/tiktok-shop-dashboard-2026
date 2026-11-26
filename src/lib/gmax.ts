@@ -8,9 +8,7 @@
 //  - ROI = GMV ÷ Ads spend  (예: 9,250,046 ÷ 6,171,495 = 1.50)
 
 import { getProductType } from "./data";
-
-const SHEET_ID = "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24";
-export const GID_GMAX = "799909766";
+import { Region, REGIONS, sheetCsvUrl } from "./region";
 
 export interface GmaxProduct {
   pid: string;       // TikTok 상품 ID (시트 1행, 없으면 "")
@@ -67,7 +65,7 @@ export function parseCSVFull(text: string): string[][] {
 
 function num(v: string | undefined): number {
   if (!v) return 0;
-  const n = parseFloat(v.replace(/[,\s₩$%#]/g, ""));
+  const n = parseFloat(v.replace(/[,\s₩$£%#]/g, ""));
   return isNaN(n) ? 0 : n;
 }
 
@@ -179,20 +177,20 @@ export function parseGmaxSheet(rows: string[][]): GmaxData {
   return { products, days };
 }
 
-// 한 페이지에서 여러 곳(Top 10, Gmax광고 탭)이 써도 시트는 한 번만 불러옴
-let gmaxPromise: Promise<GmaxData> | null = null;
-export function fetchGmax(): Promise<GmaxData> {
-  if (!gmaxPromise) {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_GMAX}`;
-    gmaxPromise = fetch(url, { cache: "no-store" })
+// 한 페이지에서 여러 곳(Top 20, Gmax광고 탭)이 써도 시트는 지역마다 한 번만 불러옴
+//  (영국 시트는 라벨이 GMV | Ads spend | ROAS, boosting 열 없음 → boosting 0으로 처리)
+const gmaxPromise: Record<string, Promise<GmaxData>> = {};
+export function fetchGmax(region: Region = REGIONS[0]): Promise<GmaxData> {
+  if (!gmaxPromise[region.key]) {
+    gmaxPromise[region.key] = fetch(sheetCsvUrl(region.sheetId, region.gmaxGid), { cache: "no-store" })
       .then(res => {
-        if (!res.ok) throw new Error("Gmax 광고 시트를 불러오지 못했어요");
+        if (!res.ok) throw new Error(`${region.label} Gmax 광고 시트를 불러오지 못했어요`);
         return res.text();
       })
       .then(text => parseGmaxSheet(parseCSVFull(text)))
-      .catch(e => { gmaxPromise = null; throw e; });
+      .catch(e => { delete gmaxPromise[region.key]; throw e; });
   }
-  return gmaxPromise;
+  return gmaxPromise[region.key];
 }
 
 // 시트는 제품마다 입력 시점이 달라서, 최근 하루이틀은 일부 제품만 채워져 있을 수 있음.

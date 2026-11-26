@@ -1,8 +1,11 @@
 "use client";
 import { useRouter, usePathname } from "next/navigation";
+import { regionOf, useRegion, withRegion, RegionKey } from "@/lib/region";
 
-const TABS = [
-  { icon: "📊", label: "대시보드", href: "/dashboard" },
+// 미국 대시보드 · 영국 대시보드를 나란히 두고, 제품별 상세정보는 보고 있던 지역 그대로 이동
+const TABS: { icon: string; label: string; href: string; region?: RegionKey }[] = [
+  { icon: "🇺🇸", label: "미국 대시보드", href: "/dashboard", region: "us" },
+  { icon: "🇬🇧", label: "영국 대시보드", href: "/dashboard", region: "uk" },
   { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
 ];
 
@@ -13,6 +16,7 @@ interface Props {
 export default function TabBar({ activeTab }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const region = useRegion(); // 페이지를 옮겨도 지역 유지
 
   return (
     <div style={{ display: "flex", borderBottom: "3px solid #e5e7eb", background: "var(--card)", padding: "0" }}>
@@ -26,15 +30,15 @@ export default function TabBar({ activeTab }: Props) {
           if (t.href === "/dashboard/products") {
             isActive = pathname === "/dashboard/products" || pathname.startsWith("/dashboard/products/");
           } else if (t.href === "/dashboard") {
-            // /dashboard 정확히 (다른 것들과 겹치지 않게)
-            isActive = pathname === "/dashboard";
+            // /dashboard 정확히 + 보고 있는 지역
+            isActive = pathname === "/dashboard" && t.region === region.key;
           }
         }
         
         return (
           <div
             key={t.label}
-            onClick={() => router.push(t.href)}
+            onClick={() => router.push(withRegion(t.href, t.region ? regionOf(t.region) : region))}
             style={{
               padding: "10px 20px",
               display: "flex",
@@ -62,6 +66,8 @@ export default function TabBar({ activeTab }: Props) {
               textShadow: isActive ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
             }}>
               {t.label}
+              {/* 제품별 상세정보는 어느 지역 데이터인지 표시 */}
+              {!t.region && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 600, color: isActive ? "#3b82f6" : "#b0b9c3" }}>{region.flag} {region.label}</span>}
             </span>
           </div>
         );

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { Chart, registerables } from "chart.js";
 import { DailyRow } from "@/lib/data";
+import { useRegion } from "@/lib/region";
 
 Chart.register(...registerables);
 
@@ -182,6 +183,7 @@ function LineChart({ title, labels, datasets, yLeftCb, yRightCb }: {
 }
 
 export default function DailyCharts({ data, activeQuick, isCustomRange = false }: Props) {
+  const region = useRegion(); // 객단가 통화: 미국 USD · 영국 GBP
   const { labels, rows } = sampleData(data, activeQuick, isCustomRange);
   const periodLabel = getPeriodLabel(activeQuick, isCustomRange);
 
@@ -240,11 +242,11 @@ export default function DailyCharts({ data, activeQuick, isCustomRange = false }
         ]}
       />
       <LineChart
-        title={`객단가 USD (${periodLabel})`}
+        title={`객단가 ${region.currency} (${periodLabel})`}
         labels={labels}
-        yLeftCb={(v) => "$" + v.toFixed(1)}
+        yLeftCb={(v) => region.symbol + v.toFixed(1)}
         datasets={[
-          { label: "객단가(USD)", data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
+          { label: `객단가(${region.currency})`, data: rows.map(r => r.unitPriceUsd), borderColor: "#06b6d4", backgroundColor: "rgba(6,182,212,0.07)", borderWidth: 2, pointRadius: 3, fill: true, tension: 0.35, yAxisID: "yLeft" },
         ]}
       />
     </div>

@@ -8,16 +8,10 @@
 import { parseCSVFull } from "./gmax";
 import { usToday } from "./kpi";
 
-// 지역별 원본 시트 (둘 다 같은 양식)
-export interface ReportRegion {
-  key: "us" | "uk"; label: string; flag: string; sheetId: string; dailyGid: string; productGid: string;
-  targetGid?: string; // 매출 목표 탭 (보고 > 월 목표). 없으면 안내 문구 표시
-  targetOpts?: { lastRow?: number; stopAtBlank?: boolean }; // 목표 표를 어디까지 읽을지
-}
-export const REGIONS: ReportRegion[] = [
-  { key: "us", label: "미국", flag: "🇺🇸", sheetId: "1hWShfZvys3FrsF0xGe4eJrCpTzJbueFDq5UMu8SQV24", dailyGid: "1032420248", productGid: "1578364048", targetGid: "275604972" },
-  { key: "uk", label: "영국", flag: "🇬🇧", sheetId: "1uwrbiCPg7OG7N38ZlYfClHeVD0gBI7RIeWLzpH7_hak", dailyGid: "0", productGid: "1578364048", targetGid: "556675240", targetOpts: { stopAtBlank: true } },
-];
+// 지역별 원본 시트 (둘 다 같은 양식) — 설정은 region.ts 한 곳에서 관리
+import { REGIONS, Region } from "./region";
+export { REGIONS };
+export type ReportRegion = Region;
 
 async function fetchCsv(sheetId: string, gid: string, what: string): Promise<string[][]> {
   const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
