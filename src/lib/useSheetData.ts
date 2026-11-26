@@ -103,6 +103,21 @@ async function fetchSheet(region: Region, gid: string) {
 // ─────────────────────────────────────────────────────────────
 // 열 위치는 헤더 이름으로 찾음 (영국 시트는 '인플 Flat Fee' 열이 없어서 ROAS·객단가 위치가 한 칸씩 당겨져 있음)
 //  찾지 못하면 미국 시트 기본 위치 사용
+// ROAS 열: 헤더가 'ROAS'면 그 열, 아니면 윗줄 'ROAS by channel' 묶음의 'Total'(전체 ROAS) 열 (26.11 미국 시트 = V열)
+function roasCol(rows: string[][], header: string[], fallback: number): number {
+  const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "").toLowerCase();
+  const direct = header.findIndex(c => norm(c) === "roas");
+  if (direct >= 0) return direct;
+  const hi = rows.indexOf(header);
+  const group = rows.slice(Math.max(0, hi - 3), hi).reverse().find(r => r.some(c => norm(c).startsWith("roas"))) || [];
+  const g = group.findIndex(c => norm(c).startsWith("roas"));
+  if (g < 0) return fallback;
+  for (let c = g; c < Math.min(header.length, g + 6); c++) {
+    if (["total", "shoptotal"].includes(norm(header[c]))) return c;
+  }
+  return g;
+}
+
 function parseDailyData(rows: string[][], minDate = ""): DailyRow[] {
   if (rows.length < 3) return [];
 
@@ -119,7 +134,7 @@ function parseDailyData(rows: string[][], minDate = ""): DailyRow[] {
     local: col(h => /^총매출\((usd|gbp|eur)\)$/.test(h), 8),  // 총 매출(현지 통화)
     krw: col(h => h === "총매출(krw)", 9),
     adCost: col(h => h === "totaladsspend" || h === "전체광고비", 11),
-    roas: col(h => h === "roas", 16),
+    roas: roasCol(rows, header, 16),
     aov: col(h => /^객단가\((usd|gbp|eur)\)$/.test(h), 18),
   };
 
