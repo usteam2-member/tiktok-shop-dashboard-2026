@@ -22,8 +22,8 @@ interface Metric {
 
 const METRICS: Metric[] = [
   { label: "총 매출 (KRW)", get: m => m.revenue, fmt: fmtManwon },
-  { label: "1) 샵 라이브 커머스", get: m => m.live, fmt: fmtManwon, sub: true, liveOnly: true, hint: "GMV | Daily X열 '1. Live'" },
-  { label: "2) 어필리에이트 및 그 외", get: m => m.affiliate, fmt: fmtManwon, sub: true, liveOnly: true, hint: "총 매출(J열) − 샵 라이브 커머스(X열)" },
+  { label: "1) 샵 라이브 커머스", get: m => m.live, fmt: fmtManwon, sub: true, liveOnly: true, hint: "GMV | Daily R열 '1. Shop live'" },
+  { label: "2) 어필리에이트 및 그 외", get: m => m.affiliate, fmt: fmtManwon, sub: true, liveOnly: true, hint: "GMV | Daily T열 '2. The rest'" },
   { label: "총 주문수", get: m => m.orders, fmt: fmtInt },
   { label: "객단가 (KRW)", get: m => m.aov, fmt: v => `${fmtInt(v)}원` },
   { label: "ROAS total", get: m => m.roasTotal, fmt: v => v.toFixed(2), hint: "총 매출 ÷ (GMV ads + Creative Boost)" },
@@ -231,7 +231,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
         </table>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost){d.region.liveFrom && " · 샵 라이브 커머스 = X열 '1. Live' (26년 11월부터) · 어필리에이트 및 그 외 = 총 매출 − 샵 라이브"}
+        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost){d.region.liveFrom && " · 샵 라이브 커머스 = R열 '1. Shop live' (26년 11월부터) · 어필리에이트 및 그 외 = T열 '2. The rest'"}
       </div>
 
       <ProductCompare data={d.products} gmax={d.gmax} cur={cur} prev={prev} label={colLabel} />

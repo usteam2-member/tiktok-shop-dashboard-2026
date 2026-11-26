@@ -3,7 +3,8 @@
 // 시트 구조: 달마다 일별 행 앞에 두 줄
 //   B열 "26년9월"  → 그 달 누적 실적
 //   B열 "마감 예상" → 그 달 마감(예상) 값  ← 월례회의 비교에 사용 (지난달은 곧 마감 값)
-// 열: G=orders, J=총 매출(KRW), M=GMV ads, N=Creative Boost, W=객단가(KRW), X=1. Live(샵 라이브 커머스 매출)
+// 열(26.11 기준): G=orders, J=총 매출(KRW), N=GMV ads, O=Creative Boost, AA=객단가(KRW)
+//  'Sales by channel': R=1. Shop live(샵 라이브 커머스), T=2. The rest(어필리에이트 및 그 외)
 
 import { parseCSVFull } from "./gmax";
 import { usToday } from "./kpi";
@@ -34,8 +35,8 @@ export interface MonthSummary {
   gmvAds: number;     // GMV ads
   boost: number;      // Creative Boost
   roasTotal: number | null; // 총 매출 ÷ (GMV ads + Creative Boost)
-  live: number | null;      // 1) 샵 라이브 커머스 매출(KRW) — X열 '1. Live'. 집계 시작 전 달은 null
-  affiliate: number | null; // 2) 어필리에이트 및 그 외 = 총 매출 − 샵 라이브
+  live: number | null;      // 1) 샵 라이브 커머스 매출(KRW) — R열 '1. Shop live'. 집계 시작 전 달은 null
+  affiliate: number | null; // 2) 어필리에이트 및 그 외 — T열 '2. The rest'
 }
 
 function num(v: string | undefined): number | null {
@@ -59,7 +60,9 @@ export function parseMonthSummaries(rows: string[][], liveFrom?: string): MonthS
   const C_GMVADS = col(["gmvads"], 12);
   const C_BOOST = col(["creativeboost"], 13);
   const C_AOV = col(["객단가(krw)"], 19);
-  const C_LIVE = col(["1.live"], 23); // X열
+  // 'Sales by channel' 아래 첫 '1. Shop live'(R열) · '2. The rest'(T열). ('1. Shop live'는 ROAS by channel 쪽에도 있어서 첫 번째 것)
+  const C_LIVE = col(["1.shoplive"], 17);
+  const C_REST = col(["2.therest"], 19);
 
   const out: MonthSummary[] = [];
   const toSummary = (ym: { year: number; month: number }, r: string[]): MonthSummary | null => {
@@ -73,7 +76,7 @@ export function parseMonthSummaries(rows: string[][], liveFrom?: string): MonthS
       key, year: ym.year, month: ym.month,
       revenue, orders, aov, gmvAds, boost,
       roasTotal: gmvAds + boost > 0 ? revenue / (gmvAds + boost) : null,
-      live, affiliate: live !== null ? revenue - live : null,
+      live, affiliate: live !== null ? (num(r[C_REST]) ?? revenue - live) : null,
     };
   };
 
