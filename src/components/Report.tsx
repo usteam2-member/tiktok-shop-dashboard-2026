@@ -16,10 +16,14 @@ interface Metric {
   get: (m: MonthSummary) => number | null;
   fmt: (v: number) => string;
   hint?: string;
+  sub?: boolean;    // 총 매출 아래 채널별 매출 (들여쓰기)
+  liveOnly?: boolean; // 라이브 집계가 있는 지역만 표시
 }
 
 const METRICS: Metric[] = [
   { label: "총 매출 (KRW)", get: m => m.revenue, fmt: fmtManwon },
+  { label: "1) 샵 라이브 커머스", get: m => m.live, fmt: fmtManwon, sub: true, liveOnly: true, hint: "GMV | Daily X열 '1. Live'" },
+  { label: "2) 어필리에이트 및 그 외", get: m => m.affiliate, fmt: fmtManwon, sub: true, liveOnly: true, hint: "총 매출(J열) − 샵 라이브 커머스(X열)" },
   { label: "총 주문수", get: m => m.orders, fmt: fmtInt },
   { label: "객단가 (KRW)", get: m => m.aov, fmt: v => `${fmtInt(v)}원` },
   { label: "ROAS total", get: m => m.roasTotal, fmt: v => v.toFixed(2), hint: "총 매출 ÷ (GMV ads + Creative Boost)" },
@@ -194,6 +198,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
   const colLabel = (m: MonthSummary) => `${m.month}월 ${isOngoing(m) ? "마감예상" : "마감"}`;
   const th: React.CSSProperties = { padding: "14px 12px", fontSize: 13, fontWeight: 500, color: "#78716c", borderBottom: "1px solid #e7e5e4" };
   const td: React.CSSProperties = { padding: "18px 12px", fontSize: 15, borderBottom: "1px solid #e7e5e4", fontVariantNumeric: "tabular-nums" };
+  const subTd: React.CSSProperties = { paddingTop: 10, paddingBottom: 10, fontSize: 14, background: "#faf9f7" };
 
   return (
     <div style={{ marginBottom: 44 }}>
@@ -209,16 +214,16 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
             </tr>
           </thead>
           <tbody>
-            {METRICS.map(mt => {
+            {METRICS.filter(mt => !mt.liveOnly || d.region.liveFrom).map(mt => {
               const a = prev ? mt.get(prev) : null;
               const b = mt.get(cur);
               const pct = a !== null && b !== null && a !== 0 ? ((b - a) / a) * 100 : null;
               return (
                 <tr key={mt.label}>
-                  <td style={{ ...td, fontWeight: 700, color: "#1c1917" }} title={mt.hint}>{mt.label}</td>
-                  <td style={{ ...td, textAlign: "right", color: "#57534e" }}>{a === null ? "-" : mt.fmt(a)}</td>
-                  <td style={{ ...td, textAlign: "right", fontWeight: 700, color: "#1c1917" }}>{b === null ? "-" : mt.fmt(b)}</td>
-                  <td style={{ ...td, textAlign: "right" }}><Change pct={pct} /></td>
+                  <td style={{ ...td, ...(mt.sub ? subTd : {}), fontWeight: mt.sub ? 500 : 700, color: mt.sub ? "#57534e" : "#1c1917", paddingLeft: mt.sub ? 32 : 12 }} title={mt.hint}>{mt.label}</td>
+                  <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", color: "#57534e" }}>{a === null ? "-" : mt.fmt(a)}</td>
+                  <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", fontWeight: mt.sub ? 600 : 700, color: "#1c1917" }}>{b === null ? "-" : mt.fmt(b)}</td>
+                  <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right" }}><Change pct={pct} /></td>
                 </tr>
               );
             })}
@@ -226,7 +231,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
         </table>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost)
+        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost){d.region.liveFrom && " · 샵 라이브 커머스 = X열 '1. Live' (26년 11월부터) · 어필리에이트 및 그 외 = 총 매출 − 샵 라이브"}
       </div>
 
       <ProductCompare data={d.products} gmax={d.gmax} cur={cur} prev={prev} label={colLabel} />

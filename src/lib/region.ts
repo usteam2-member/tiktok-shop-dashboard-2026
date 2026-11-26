@@ -20,6 +20,7 @@ export interface Region {
   symbol: string;
   minDate?: string;    // 이 날짜("YYYYMMDD") 이전 일별 행은 무시 (영국 파일 위쪽에 미국 25년 데이터가 남아 있음)
   hasKpi: boolean;     // KPI 트랙킹 시트 연결 여부
+  liveFrom?: string;   // 샵 라이브 커머스 매출(GMV | Daily '1. Live' 열) 집계 시작 월 "YYYY-MM" — 없으면 보고 탭에 채널별 매출 행 숨김
 }
 
 export const REGIONS: Region[] = [
@@ -29,6 +30,7 @@ export const REGIONS: Region[] = [
     dailyGid: "1032420248", productGid: "1578364048", sojaeGid: "367495503", gmaxGid: "799909766",
     targetGid: "275604972",
     currency: "USD", symbol: "$", hasKpi: true,
+    liveFrom: "2026-11", // 라이브는 26년 11월부터 시작 (10월 이전 X열 값은 쓰지 않음)
   },
   {
     key: "uk", label: "영국", flag: "🇬🇧",
