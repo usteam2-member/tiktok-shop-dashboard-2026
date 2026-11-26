@@ -198,6 +198,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
   const colLabel = (m: MonthSummary) => `${m.month}월 ${isOngoing(m) ? "마감예상" : "마감"}`;
   const th: React.CSSProperties = { padding: "14px 12px", fontSize: 13, fontWeight: 500, color: "#78716c", borderBottom: "1px solid #e7e5e4" };
   const td: React.CSSProperties = { padding: "18px 12px", fontSize: 15, borderBottom: "1px solid #e7e5e4", fontVariantNumeric: "tabular-nums" };
+  const showShare = !!d.region.liveFrom; // 채널별 매출이 있는 지역만 '채널 비중' 열 표시
   const subTd: React.CSSProperties = { paddingTop: 10, paddingBottom: 10, fontSize: 14, background: "#faf9f7" };
 
   return (
@@ -210,6 +211,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
               <th style={{ ...th, textAlign: "left" }}>지표</th>
               <th style={{ ...th, textAlign: "right" }}>{prev ? colLabel(prev) : "전월"}</th>
               <th style={{ ...th, textAlign: "right" }}>{colLabel(cur)}</th>
+              {showShare && <th style={{ ...th, textAlign: "right" }} title="채널별 매출 ÷ 총 매출">채널 비중</th>}
               <th style={{ ...th, textAlign: "right" }}>증감({prev ? prev.month : "-"}→{cur.month}월)</th>
             </tr>
           </thead>
@@ -217,12 +219,16 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
             {METRICS.filter(mt => !mt.liveOnly || d.region.liveFrom).map(mt => {
               const a = prev ? mt.get(prev) : null;
               const b = mt.get(cur);
+              // 채널 비중: 총 매출 = 100%, 채널별 매출 = 그 채널 ÷ 총 매출, 나머지 지표는 빈 칸
+              const share = mt.sub ? (b !== null && cur.revenue > 0 ? `${((b / cur.revenue) * 100).toFixed(1)}%` : "-")
+                : mt.label.startsWith("총 매출") && cur.live !== null ? "100%" : "";
               const pct = a !== null && b !== null && a !== 0 ? ((b - a) / a) * 100 : null;
               return (
                 <tr key={mt.label}>
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), fontWeight: mt.sub ? 500 : 700, color: mt.sub ? "#57534e" : "#1c1917", paddingLeft: mt.sub ? 32 : 12 }} title={mt.hint}>{mt.label}</td>
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", color: "#57534e" }}>{a === null ? "-" : mt.fmt(a)}</td>
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", fontWeight: mt.sub ? 600 : 700, color: "#1c1917" }}>{b === null ? "-" : mt.fmt(b)}</td>
+                  {showShare && <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right", color: mt.sub ? "#2563eb" : "#78716c", fontWeight: mt.sub ? 700 : 500 }}>{share}</td>}
                   <td style={{ ...td, ...(mt.sub ? subTd : {}), textAlign: "right" }}><Change pct={pct} /></td>
                 </tr>
               );
@@ -231,7 +237,7 @@ function RegionSection({ d, monthKey }: { d: RegionData; monthKey: string }) {
         </table>
       </div>
       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8 }}>
-        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost){d.region.liveFrom && " · 샵 라이브 커머스 = R열 '1. Shop live' (26년 11월부터) · 어필리에이트 및 그 외 = T열 '2. The rest'"}
+        출처: {d.region.label} 시트 GMV | Daily (끝난 달 = 월 누적 행, 진행 중인 달 = &apos;마감 예상&apos; 행) · ROAS total = 총 매출 ÷ (GMV ads + Creative Boost){d.region.liveFrom && " · 샵 라이브 커머스 = R열 '1. Shop live' (26년 11월부터) · 어필리에이트 및 그 외 = T열 '2. The rest' · 채널 비중 = 채널별 매출 ÷ 총 매출"}
       </div>
 
       <ProductCompare data={d.products} gmax={d.gmax} cur={cur} prev={prev} label={colLabel} />
