@@ -2,11 +2,12 @@
 import { useRouter, usePathname } from "next/navigation";
 import { regionOf, useRegion, withRegion, RegionKey } from "@/lib/region";
 
-// 미국 대시보드 · 영국 대시보드를 나란히 두고, 제품별 상세정보는 보고 있던 지역 그대로 이동
-const TABS: { icon: string; label: string; href: string; region?: RegionKey }[] = [
+// 미국·영국 대시보드와 제품별 상세정보를 지역별로 나눠서 나란히 표시
+const TABS: { icon: string; label: string; href: string; region: RegionKey }[] = [
   { icon: "🇺🇸", label: "미국 대시보드", href: "/dashboard", region: "us" },
   { icon: "🇬🇧", label: "영국 대시보드", href: "/dashboard", region: "uk" },
-  { icon: "🔍", label: "제품별 상세정보", href: "/dashboard/products" },
+  { icon: "🔍", label: "미국 제품별 상세정보", href: "/dashboard/products", region: "us" },
+  { icon: "🔍", label: "영국 제품별 상세정보", href: "/dashboard/products", region: "uk" },
 ];
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 export default function TabBar({ activeTab }: Props) {
   const router = useRouter();
   const pathname = usePathname();
-  const region = useRegion(); // 페이지를 옮겨도 지역 유지
+  const region = useRegion(); // 지금 보고 있는 지역 (활성 탭 표시용)
 
   return (
     <div style={{ display: "flex", borderBottom: "3px solid #e5e7eb", background: "var(--card)", padding: "0" }}>
@@ -28,7 +29,7 @@ export default function TabBar({ activeTab }: Props) {
         } else {
           // 더 구체적인 경로부터 확인 (순서 중요!)
           if (t.href === "/dashboard/products") {
-            isActive = pathname === "/dashboard/products" || pathname.startsWith("/dashboard/products/");
+            isActive = (pathname === "/dashboard/products" || pathname.startsWith("/dashboard/products/")) && t.region === region.key;
           } else if (t.href === "/dashboard") {
             // /dashboard 정확히 + 보고 있는 지역
             isActive = pathname === "/dashboard" && t.region === region.key;
@@ -38,7 +39,7 @@ export default function TabBar({ activeTab }: Props) {
         return (
           <div
             key={t.label}
-            onClick={() => router.push(withRegion(t.href, t.region ? regionOf(t.region) : region))}
+            onClick={() => router.push(withRegion(t.href, regionOf(t.region)))}
             style={{
               padding: "10px 20px",
               display: "flex",
@@ -66,8 +67,6 @@ export default function TabBar({ activeTab }: Props) {
               textShadow: isActive ? "0 1px 2px rgba(0,0,0,0.1)" : "none",
             }}>
               {t.label}
-              {/* 제품별 상세정보는 어느 지역 데이터인지 표시 */}
-              {!t.region && <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 600, color: isActive ? "#3b82f6" : "#b0b9c3" }}>{region.flag} {region.label}</span>}
             </span>
           </div>
         );

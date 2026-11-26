@@ -3,7 +3,7 @@
 // 시트 구조: 달마다 일별 행 앞에 두 줄
 //   B열 "26년9월"  → 그 달 누적 실적
 //   B열 "마감 예상" → 그 달 마감(예상) 값  ← 월례회의 비교에 사용 (지난달은 곧 마감 값)
-// 열: G=orders, J=총 매출(KRW), M=GMV ads, N=Creative Boost, T=객단가(KRW)
+// 열: G=orders, J=총 매출(KRW), M=GMV ads, N=Creative Boost, W=객단가(KRW), X=1. Live(샵 라이브 커머스 매출)
 
 import { parseCSVFull } from "./gmax";
 import { usToday } from "./kpi";
@@ -34,6 +34,8 @@ export interface MonthSummary {
   gmvAds: number;     // GMV ads
   boost: number;      // Creative Boost
   roasTotal: number | null; // 총 매출 ÷ (GMV ads + Creative Boost)
+  live: number | null;      // 1) 샵 라이브 커머스 매출(KRW) — X열 '1. Live'. 집계 시작 전 달은 null
+  affiliate: number | null; // 2) 어필리에이트 및 그 외 = 총 매출 − 샵 라이브
 }
 
 function num(v: string | undefined): number | null {
@@ -43,7 +45,7 @@ function num(v: string | undefined): number | null {
   return isNaN(n) ? null : n;
 }
 
-export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
+export function parseMonthSummaries(rows: string[][], liveFrom?: string): MonthSummary[] {
   // 열 위치: 헤더 이름으로 찾고, 없으면 미국 시트 기본 위치 사용
   const norm = (v: string | undefined) => (v || "").replace(/\s+/g, "").toLowerCase();
   // 헤더 행 = orders와 GMV ads가 함께 있는 행 (영국 시트는 매출 열 제목이 비어 있음)
@@ -57,6 +59,7 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
   const C_GMVADS = col(["gmvads"], 12);
   const C_BOOST = col(["creativeboost"], 13);
   const C_AOV = col(["객단가(krw)"], 19);
+  const C_LIVE = col(["1.live"], 23); // X열
 
   const out: MonthSummary[] = [];
   const toSummary = (ym: { year: number; month: number }, r: string[]): MonthSummary | null => {
@@ -64,11 +67,13 @@ export function parseMonthSummaries(rows: string[][]): MonthSummary[] {
     if (revenue === null || orders === null || revenue <= 0) return null; // 아직 데이터 없는 달
     const gmvAds = num(r[C_GMVADS]) ?? 0, boost = num(r[C_BOOST]) ?? 0;
     const aov = num(r[C_AOV]) ?? (orders > 0 ? revenue / orders : 0);
+    const key = `${ym.year}-${String(ym.month).padStart(2, "0")}`;
+    const live = liveFrom && key >= liveFrom ? num(r[C_LIVE]) : null;
     return {
-      key: `${ym.year}-${String(ym.month).padStart(2, "0")}`,
-      year: ym.year, month: ym.month,
+      key, year: ym.year, month: ym.month,
       revenue, orders, aov, gmvAds, boost,
       roasTotal: gmvAds + boost > 0 ? revenue / (gmvAds + boost) : null,
+      live, affiliate: live !== null ? revenue - live : null,
     };
   };
 
@@ -92,7 +97,7 @@ const summaryCache: Record<string, Promise<MonthSummary[]>> = {};
 export function fetchMonthSummaries(region: ReportRegion = REGIONS[0]): Promise<MonthSummary[]> {
   if (!summaryCache[region.key]) {
     summaryCache[region.key] = fetchCsv(region.sheetId, region.dailyGid, `${region.label} 주요지표`)
-      .then(parseMonthSummaries)
+      .then(rows => parseMonthSummaries(rows, region.liveFrom))
       .catch(e => { delete summaryCache[region.key]; throw e; });
   }
   return summaryCache[region.key];

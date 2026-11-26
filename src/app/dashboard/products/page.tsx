@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSheetData } from "@/lib/useSheetData";
 import { useRegion } from "@/lib/region";
 import Navbar from "@/components/Navbar";
@@ -18,6 +18,9 @@ export default function ProductsPage() {
   const { data, loading, error } = useSheetData(region);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+
+  // 미국 ↔ 영국 탭을 바꾸면 검색어·열려 있던 제품 초기화 (다른 지역 제품이 섞여 보이지 않게)
+  useEffect(() => { setSearchQuery(""); setSelectedProduct(null); }, [region.key]);
 
   // 제품 목록 생성
   const allProducts = useMemo(() => {
@@ -77,10 +80,10 @@ export default function ProductsPage() {
           <div>
             <div style={{ marginBottom: "30px" }}>
               <h2 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "12px", color: "#1f2937" }}>
-                제품 검색
+                {region.flag} {region.label} 제품 검색
               </h2>
               <p style={{ fontSize: "14px", color: "#666", marginBottom: "16px" }}>
-                제품명, PID, SKU로 검색하세요
+                {region.label} TikTok Shop 제품을 제품명, PID, SKU로 검색하세요
               </p>
               
               <div style={{ position: "relative" }}>
@@ -194,7 +197,7 @@ export default function ProductsPage() {
                   제품을 검색하세요
                 </div>
                 <div style={{ fontSize: "14px" }}>
-                  전체 {allProducts.length}개의 제품이 있습니다
+                  {region.label} 전체 {allProducts.length}개의 제품이 있습니다
                 </div>
               </div>
             )}
